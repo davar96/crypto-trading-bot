@@ -10,13 +10,13 @@ class Strategy:
         self,
         sma_period=20,
         rsi_period=14,
-        atr_period=14,  # <-- ADDED
+        atr_period=14,
         rsi_overbought=70,
-        rsi_oversold=35,
+        rsi_oversold=40,
     ):
         self.sma_period = sma_period
         self.rsi_period = rsi_period
-        self.atr_period = atr_period  # <-- ADDED
+        self.atr_period = atr_period
         self.rsi_overbought = rsi_overbought
         self.rsi_oversold = rsi_oversold
         logger.info(f"Strategy: Initialized with SMA({sma_period}), RSI({rsi_period}), ATR({atr_period})")
@@ -32,7 +32,6 @@ class Strategy:
 
         return 100 - (100 / (1 + rs))
 
-    # --- THIS ENTIRE FUNCTION WAS MISSING ---
     def _calculate_atr(self, data, period):
         """Calculates the Average True Range (ATR)"""
         high_low = data["high"] - data["low"]

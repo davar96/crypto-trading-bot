@@ -1,3 +1,5 @@
+# src/main.py
+
 from bot.trading_bot import TradingBot
 from bot.logger import logger
 import os
@@ -12,21 +14,13 @@ if __name__ == "__main__":
         logger.error("Error: TESTNET_API_KEY or TESTNET_SECRET_KEY not found.")
         logger.error("Please check your .env file.")
     else:
-        # The list of coins you want to trade
-        symbols = [
-            'BTC/USDT', 
-            'ETH/USDT',
-            'SOL/USDT',
-            'BNB/USDT',
-            'XRP/USDT',
-            'ADA/USDT',
-            'LINK/USDT',
-            'AVAX/USDT'
-        ]
+        # --- REVERT TO THE TESTNET-COMPATIBLE LIST ---
+        symbols = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "ADA/USDT", "LINK/USDT", "AVAX/USDT"]
+        # --- END OF CHANGE ---
 
         logger.info("Starting Trading Bot...")
         logger.info(f"Trading symbols: {', '.join(symbols)}")
-        
+
         # Create and run the bot
         bot = TradingBot(api_key=api_key, secret_key=secret_key, symbols=symbols)
         bot.run()

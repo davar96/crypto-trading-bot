@@ -19,7 +19,9 @@ class Strategy:
         self.atr_period = atr_period
         self.rsi_overbought = rsi_overbought
         self.rsi_oversold = rsi_oversold
-        logger.info(f"Strategy: Initialized with SMA({sma_period}), RSI({rsi_period}), ATR({atr_period})")
+        logger.info(
+            f"Strategy: Initialized with SMA({sma_period}), RSI({rsi_period}), ATR({atr_period})"
+        )
 
     def _calculate_rsi(self, data, period):
         delta = data["close"].diff()
@@ -42,50 +44,61 @@ class Strategy:
 
         return tr.rolling(window=period).mean()
 
-    def get_signal(self, ohlcv_data, current_price):
+    def get_signal(self, ohlcv_5m, ohlcv_1h, current_price):
         """
-        MODIFIED: "Buy the Dip" in an uptrend.
+        MODIFIED V4: Multi-Timeframe Analysis (MTA).
+        Uses 1-hour data for the main trend and 5-minute data for the entry signal.
         """
-        if len(ohlcv_data) < max(self.sma_period, self.rsi_period, self.atr_period) + 10:
-            return {"signal": "HOLD", "sma": None, "rsi": None, "atr": None}
+        # --- 1. The Higher Timeframe (1-Hour) Trend Filter ---
+        if len(ohlcv_1h) < self.sma_period:
+            return {"signal": "HOLD"}  # Not enough data for trend analysis
 
-        df = pd.DataFrame(ohlcv_data, columns=["timestamp", "open", "high", "low", "close", "volume"])
+        df_1h = pd.DataFrame(
+            ohlcv_1h, columns=["timestamp", "open", "high", "low", "close", "volume"]
+        )
+        df_1h["sma"] = df_1h["close"].rolling(window=self.sma_period).mean()
 
-        # --- Indicator Calculations (no change) ---
-        df["sma"] = df["close"].rolling(window=self.sma_period).mean()
-        df["rsi"] = self._calculate_rsi(df, period=self.rsi_period)
-        df["atr"] = self._calculate_atr(df, period=self.atr_period)
-        df["sma_slope"] = df["sma"].diff(5) / df["sma"].shift(5) * 100
+        # Check if the last closed 1h candle was above its SMA
+        last_1h_candle = df_1h.iloc[-2]
+        is_h1_uptrend = last_1h_candle["close"] > last_1h_candle["sma"]
 
-        # --- Get Latest Values (no change) ---
-        latest_sma = df["sma"].iloc[-1]
-        latest_rsi = df["rsi"].iloc[-1]
-        prev_rsi = df["rsi"].iloc[-2]  # Get previous RSI to detect crossover
-        latest_slope = df["sma_slope"].iloc[-1]
-        latest_atr = df["atr"].iloc[-1]
+        if not is_h1_uptrend:
+            # If the main 1-hour trend is not up, we do not proceed.
+            # This is the most important filter.
+            return {"signal": "HOLD", "h1_trend": "DOWN"}
+
+        # --- 2. The Lower Timeframe (5-Minute) Entry Trigger ---
+        # We only get to this point if the 1-hour trend is UP.
+        if len(ohlcv_5m) < max(self.sma_period, self.rsi_period, self.atr_period) + 10:
+            return {"signal": "HOLD", "h1_trend": "UP"}
+
+        df_5m = pd.DataFrame(
+            ohlcv_5m, columns=["timestamp", "open", "high", "low", "close", "volume"]
+        )
+
+        df_5m["sma"] = df_5m["close"].rolling(window=self.sma_period).mean()
+        df_5m["rsi"] = self._calculate_rsi(df_5m, period=self.rsi_period)
+        df_5m["atr"] = self._calculate_atr(df_5m, period=self.atr_period)
+
+        latest_5m = df_5m.iloc[-1]
+        prev_5m = df_5m.iloc[-2]
 
         signal = "HOLD"
 
-        # --- NEW "BUY THE DIP" CONDITIONS ---
-        # 1. Overall trend must be up.
-        is_uptrend = current_price > latest_sma and latest_slope > 0.05  # Loosened slope slightly
+        # Using our existing "Confirmation Candle" logic on the 5-minute chart
+        is_5m_uptrend = prev_5m["close"] > prev_5m["sma"]
+        rsi_crossed_up = (
+            prev_5m["rsi"] > self.rsi_oversold
+            and df_5m.iloc[-3]["rsi"] <= self.rsi_oversold
+        )
+        is_confirmation_candle = prev_5m["close"] > prev_5m["open"]
 
-        # 2. We are looking for a dip (RSI was low) and is now recovering.
-        #    This is a classic "buy the dip" signal.
-        rsi_buy_signal = latest_rsi > self.rsi_oversold and prev_rsi <= self.rsi_oversold
-
-        if is_uptrend and rsi_buy_signal:
+        if is_5m_uptrend and rsi_crossed_up and is_confirmation_candle:
             signal = "BUY"
-            logger.debug(f"BUY (Pullback) signal: RSI crossed above {self.rsi_oversold}. Trend is UP.")
-
-        # --- SELL CONDITIONS (still disabled in bot, but kept for completeness) ---
-        elif current_price < latest_sma or latest_rsi > self.rsi_overbought:
-            signal = "SELL"
+            logger.debug(f"BUY (MTA) signal: H1 Trend is UP. 5m confirmed dip entry.")
 
         return {
             "signal": signal,
-            "sma": latest_sma,
-            "rsi": latest_rsi,
-            "slope": latest_slope,
-            "atr": latest_atr,
-        }
+            "atr": latest_5m["atr"],
+            "h1_trend": "UP",
+        }  # Add state for debugging

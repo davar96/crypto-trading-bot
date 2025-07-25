@@ -19,9 +19,7 @@ class Strategy:
         self.atr_period = atr_period
         self.rsi_overbought = rsi_overbought
         self.rsi_oversold = rsi_oversold
-        logger.info(
-            f"Strategy: Initialized with SMA({sma_period}), RSI({rsi_period}), ATR({atr_period})"
-        )
+        logger.info(f"Strategy: Initialized with SMA({sma_period}), RSI({rsi_period}), ATR({atr_period})")
 
     def _calculate_rsi(self, data, period):
         delta = data["close"].diff()
@@ -46,59 +44,53 @@ class Strategy:
 
     def get_signal(self, ohlcv_5m, ohlcv_1h, current_price):
         """
-        MODIFIED V4: Multi-Timeframe Analysis (MTA).
-        Uses 1-hour data for the main trend and 5-minute data for the entry signal.
+        MODIFIED V5: Optimized Entry Logic.
+        Removes the 5m trend filter to better catch dips and uses a lookback for the RSI crossover.
         """
-        # --- 1. The Higher Timeframe (1-Hour) Trend Filter ---
+        # --- 1. The Higher Timeframe (1-Hour) Trend Filter (No Change) ---
         if len(ohlcv_1h) < self.sma_period:
-            return {"signal": "HOLD"}  # Not enough data for trend analysis
+            return {"signal": "HOLD"}
 
-        df_1h = pd.DataFrame(
-            ohlcv_1h, columns=["timestamp", "open", "high", "low", "close", "volume"]
-        )
+        df_1h = pd.DataFrame(ohlcv_1h, columns=["timestamp", "open", "high", "low", "close", "volume"])
         df_1h["sma"] = df_1h["close"].rolling(window=self.sma_period).mean()
 
-        # Check if the last closed 1h candle was above its SMA
         last_1h_candle = df_1h.iloc[-2]
         is_h1_uptrend = last_1h_candle["close"] > last_1h_candle["sma"]
 
         if not is_h1_uptrend:
-            # If the main 1-hour trend is not up, we do not proceed.
-            # This is the most important filter.
             return {"signal": "HOLD", "h1_trend": "DOWN"}
 
-        # --- 2. The Lower Timeframe (5-Minute) Entry Trigger ---
-        # We only get to this point if the 1-hour trend is UP.
+        # --- 2. The Lower Timeframe (5-Minute) Entry Trigger (MODIFIED) ---
         if len(ohlcv_5m) < max(self.sma_period, self.rsi_period, self.atr_period) + 10:
             return {"signal": "HOLD", "h1_trend": "UP"}
 
-        df_5m = pd.DataFrame(
-            ohlcv_5m, columns=["timestamp", "open", "high", "low", "close", "volume"]
-        )
-
+        df_5m = pd.DataFrame(ohlcv_5m, columns=["timestamp", "open", "high", "low", "close", "volume"])
         df_5m["sma"] = df_5m["close"].rolling(window=self.sma_period).mean()
         df_5m["rsi"] = self._calculate_rsi(df_5m, period=self.rsi_period)
         df_5m["atr"] = self._calculate_atr(df_5m, period=self.atr_period)
 
         latest_5m = df_5m.iloc[-1]
-        prev_5m = df_5m.iloc[-2]
 
         signal = "HOLD"
 
-        # Using our existing "Confirmation Candle" logic on the 5-minute chart
-        is_5m_uptrend = prev_5m["close"] > prev_5m["sma"]
-        rsi_crossed_up = (
-            prev_5m["rsi"] > self.rsi_oversold
-            and df_5m.iloc[-3]["rsi"] <= self.rsi_oversold
-        )
+        # --- NEW OPTIMIZED ENTRY LOGIC ---
+
+        # Condition 1: Look for an RSI crossover within the last 3 closed candles.
+        rsi_crossed_up = False
+        # We check the 3 most recent closed candles (indices -4, -3, -2)
+        for i in range(-4, -1):
+            if df_5m.iloc[i + 1]["rsi"] > self.rsi_oversold and df_5m.iloc[i]["rsi"] <= self.rsi_oversold:
+                rsi_crossed_up = True
+                break
+
+        # Condition 2: The most recent closed candle must be a green confirmation candle.
+        prev_5m = df_5m.iloc[-2]
         is_confirmation_candle = prev_5m["close"] > prev_5m["open"]
 
-        if is_5m_uptrend and rsi_crossed_up and is_confirmation_candle:
+        # We no longer require the 5m trend to be up, as a dip can temporarily break it.
+        # The H1 trend is our primary directional filter.
+        if rsi_crossed_up and is_confirmation_candle:
             signal = "BUY"
-            logger.debug(f"BUY (MTA) signal: H1 Trend is UP. 5m confirmed dip entry.")
+            logger.debug(f"BUY (Optimized MTA) signal: H1 Trend is UP. 5m confirmed dip entry.")
 
-        return {
-            "signal": signal,
-            "atr": latest_5m["atr"],
-            "h1_trend": "UP",
-        }  # Add state for debugging
+        return {"signal": signal, "atr": latest_5m["atr"], "h1_trend": "UP"}

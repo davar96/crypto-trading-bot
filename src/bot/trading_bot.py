@@ -20,9 +20,9 @@ class TradingBot:
         self.symbols = symbols
         self.last_state_save = time.time()
         self.last_trade_time = defaultdict(float)
-        self.position_cooldown = 300
+        self.position_cooldown = 3600
         self._restore_state()
-        logger.info("TradingBot: Initialized.")
+        logger.info(f"TradingBot: Cooldown period set to {self.position_cooldown / 60} minutes.")
 
     def _check_for_exits(self):
         """Checks for positions closed by SL/TP or trailed stops."""

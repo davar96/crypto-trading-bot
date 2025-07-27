@@ -42,25 +42,25 @@ class Strategy:
 
         return tr.rolling(window=period).mean()
 
+    # In src/bot/strategy.py, replace the get_signal method
+
     def get_signal(self, ohlcv_5m, ohlcv_1h, current_price):
         """
-        MODIFIED V5: Optimized Entry Logic.
-        Removes the 5m trend filter to better catch dips and uses a lookback for the RSI crossover.
+        MODIFIED V6: Professional Overhaul.
+        Adds a minimum volatility filter to avoid chop.
         """
         # --- 1. The Higher Timeframe (1-Hour) Trend Filter (No Change) ---
         if len(ohlcv_1h) < self.sma_period:
             return {"signal": "HOLD"}
-
         df_1h = pd.DataFrame(ohlcv_1h, columns=["timestamp", "open", "high", "low", "close", "volume"])
         df_1h["sma"] = df_1h["close"].rolling(window=self.sma_period).mean()
-
         last_1h_candle = df_1h.iloc[-2]
         is_h1_uptrend = last_1h_candle["close"] > last_1h_candle["sma"]
 
         if not is_h1_uptrend:
             return {"signal": "HOLD", "h1_trend": "DOWN"}
 
-        # --- 2. The Lower Timeframe (5-Minute) Entry Trigger (MODIFIED) ---
+        # --- 2. The Lower Timeframe (5-Minute) Analysis ---
         if len(ohlcv_5m) < max(self.sma_period, self.rsi_period, self.atr_period) + 10:
             return {"signal": "HOLD", "h1_trend": "UP"}
 
@@ -70,27 +70,33 @@ class Strategy:
         df_5m["atr"] = self._calculate_atr(df_5m, period=self.atr_period)
 
         latest_5m = df_5m.iloc[-1]
+        latest_atr = latest_5m["atr"]
+
+        # --- NEW: Volatility Filter ---
+        # Don't trade if the market is dead flat (chop zone)
+        # We define "flat" as an ATR less than 0.4% of the current price
+        min_volatility = current_price * 0.004
+        if latest_atr < min_volatility:
+            logger.debug(
+                f"Signal ignored for {current_price}: Low volatility. ATR ({latest_atr:.4f}) is below threshold ({min_volatility:.4f})."
+            )
+            return {"signal": "HOLD", "h1_trend": "UP"}
+        # --- END OF NEW FILTER ---
 
         signal = "HOLD"
 
-        # --- NEW OPTIMIZED ENTRY LOGIC ---
-
-        # Condition 1: Look for an RSI crossover within the last 3 closed candles.
+        # --- Optimized Entry Logic (No Change) ---
         rsi_crossed_up = False
-        # We check the 3 most recent closed candles (indices -4, -3, -2)
         for i in range(-4, -1):
             if df_5m.iloc[i + 1]["rsi"] > self.rsi_oversold and df_5m.iloc[i]["rsi"] <= self.rsi_oversold:
                 rsi_crossed_up = True
                 break
 
-        # Condition 2: The most recent closed candle must be a green confirmation candle.
         prev_5m = df_5m.iloc[-2]
         is_confirmation_candle = prev_5m["close"] > prev_5m["open"]
 
-        # We no longer require the 5m trend to be up, as a dip can temporarily break it.
-        # The H1 trend is our primary directional filter.
         if rsi_crossed_up and is_confirmation_candle:
             signal = "BUY"
-            logger.debug(f"BUY (Optimized MTA) signal: H1 Trend is UP. 5m confirmed dip entry.")
+            logger.debug(f"BUY (Pro) signal: H1 Trend UP, Volatility OK, Confirmed 5m dip entry.")
 
-        return {"signal": signal, "atr": latest_5m["atr"], "h1_trend": "UP"}
+        return {"signal": signal, "atr": latest_atr, "h1_trend": "UP"}

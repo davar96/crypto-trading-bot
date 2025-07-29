@@ -42,61 +42,53 @@ class Strategy:
 
         return tr.rolling(window=period).mean()
 
-    # In src/bot/strategy.py, replace the get_signal method
-
     def get_signal(self, ohlcv_5m, ohlcv_1h, current_price):
         """
-        MODIFIED V6: Professional Overhaul.
-        Adds a minimum volatility filter to avoid chop.
+        MODIFIED V7: Added Volume Confirmation.
         """
-        # --- 1. The Higher Timeframe (1-Hour) Trend Filter (No Change) ---
+        # --- 1. H1 Trend Filter (No Change) ---
         if len(ohlcv_1h) < self.sma_period:
             return {"signal": "HOLD"}
         df_1h = pd.DataFrame(ohlcv_1h, columns=["timestamp", "open", "high", "low", "close", "volume"])
-        df_1h["sma"] = df_1h["close"].rolling(window=self.sma_period).mean()
+        df_1h["sma"] = self._calculate_sma(df_1h, self.sma_period)
         last_1h_candle = df_1h.iloc[-2]
         is_h1_uptrend = last_1h_candle["close"] > last_1h_candle["sma"]
-
         if not is_h1_uptrend:
             return {"signal": "HOLD", "h1_trend": "DOWN"}
 
-        # --- 2. The Lower Timeframe (5-Minute) Analysis ---
+        # --- 2. 5-Minute Analysis ---
         if len(ohlcv_5m) < max(self.sma_period, self.rsi_period, self.atr_period) + 10:
             return {"signal": "HOLD", "h1_trend": "UP"}
 
         df_5m = pd.DataFrame(ohlcv_5m, columns=["timestamp", "open", "high", "low", "close", "volume"])
-        df_5m["sma"] = df_5m["close"].rolling(window=self.sma_period).mean()
-        df_5m["rsi"] = self._calculate_rsi(df_5m, period=self.rsi_period)
-        df_5m["atr"] = self._calculate_atr(df_5m, period=self.atr_period)
+        df_5m["rsi"] = self._calculate_rsi(df_5m, self.rsi_period)
+        df_5m["atr"] = self._calculate_atr(df_5m, self.atr_period)
+
+        # --- NEW: Calculate average volume ---
+        df_5m["avg_volume"] = df_5m["volume"].rolling(window=20).mean()
 
         latest_5m = df_5m.iloc[-1]
-        latest_atr = latest_5m["atr"]
+        prev_5m = df_5m.iloc[-2]
 
-        # --- NEW: Volatility Filter ---
-        # Don't trade if the market is dead flat (chop zone)
-        # We define "flat" as an ATR less than 0.4% of the current price
-        min_volatility = current_price * 0.004
-        if latest_atr < min_volatility:
-            logger.debug(
-                f"Signal ignored for {current_price}: Low volatility. ATR ({latest_atr:.4f}) is below threshold ({min_volatility:.4f})."
-            )
-            return {"signal": "HOLD", "h1_trend": "UP"}
-        # --- END OF NEW FILTER ---
-
+        # --- Entry Logic with Volume Confirmation ---
         signal = "HOLD"
-
-        # --- Optimized Entry Logic (No Change) ---
         rsi_crossed_up = False
         for i in range(-4, -1):
             if df_5m.iloc[i + 1]["rsi"] > self.rsi_oversold and df_5m.iloc[i]["rsi"] <= self.rsi_oversold:
                 rsi_crossed_up = True
                 break
 
-        prev_5m = df_5m.iloc[-2]
         is_confirmation_candle = prev_5m["close"] > prev_5m["open"]
 
-        if rsi_crossed_up and is_confirmation_candle:
-            signal = "BUY"
-            logger.debug(f"BUY (Pro) signal: H1 Trend UP, Volatility OK, Confirmed 5m dip entry.")
+        # --- THE NEW RULE ---
+        volume_confirmed = prev_5m["volume"] > prev_5m["avg_volume"] * 1.5  # Volume must be 50% above average
 
-        return {"signal": signal, "atr": latest_atr, "h1_trend": "UP"}
+        if rsi_crossed_up and is_confirmation_candle and volume_confirmed:
+            signal = "BUY"
+            logger.debug(f"BUY (Volume Confirmed MTA) signal: H1 Trend UP, Confirmed 5m dip, Volume spike.")
+
+        return {"signal": signal, "atr": latest_5m["atr"], "h1_trend": "UP"}
+
+    def _calculate_sma(self, data, period):
+        """Helper method for vectorized backtester."""
+        return data["close"].rolling(window=period).mean()

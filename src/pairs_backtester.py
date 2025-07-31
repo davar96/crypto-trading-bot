@@ -6,230 +6,244 @@ import sys
 import os
 from statsmodels.tsa.stattools import coint
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
-# --- Strategy & Backtest Configuration ---
-
-# -- Core Parameters --
-SYMBOL_A = "ETH/USDT"
-SYMBOL_B = "BTC/USDT"
+# --- Configuration ---
+# --- CHANGE: Symbols are now passed as arguments, removed hardcoded symbols ---
 START_YEAR = 2021
-
 # -- Strategy Parameters --
-COINT_WINDOW = 250 * 24  # Rolling window for cointegration test (hours)
-ZSCORE_LOOKBACK = 50  # Lookback for calculating the z-score
-ENTRY_ZSCORE = 2.0  # Z-score threshold to open a position
-EXIT_ZSCORE = 0.0  # Z-score threshold to close a position
-STOP_LOSS_ZSCORE = 3.5  # Z-score threshold for stop-loss
+COINT_WINDOW = 250 * 24
+ZSCORE_LOOKBACK = 50
+BETA_WINDOW = 100
+ENTRY_ZSCORE = 2.0
+EXIT_ZSCORE = 0.0
+STOP_LOSS_ZSCORE = 4.0
+# -- Professional Risk Management Parameters --
+RISK_PER_TRADE_PCT = 0.01  # Risk 1% of current equity per trade
+TIME_STOP_LOOKBACK = 250 * 24
+MAX_HOLDING_PERIOD_MULTIPLIER = 2.0
 
-# -- Portfolio & Risk Parameters --
+# -- Portfolio & Cost Parameters --
 INITIAL_CAPITAL = 10000.0
-TRADE_VALUE = 1000.0  # Value of each leg of the pair trade in USDT
-TRANSACTION_FEE = 0.001  # 0.1% fee per trade
-SLIPPAGE = 0.0005  # 0.05% slippage per trade
+TRANSACTION_FEE = 0.001
+SLIPPAGE = 0.0005
 
 
-def run_pairs_backtest(symbol_a, symbol_b, start_year):
-    print("--- Starting Pairs Trading Backtest ---")
-    print(f"Pair: {symbol_a} vs {symbol_b}")
-    print(f"Data Period: {start_year} to Present")
+def calculate_half_life(series):
+    """Calculates the half-life of mean reversion for a time series."""
+    lagged = series.shift(1).fillna(0)
+    delta = series - lagged
+    delta.dropna(inplace=True)
+    lagged = lagged.loc[delta.index]
 
-    # --- 1. Load and Prepare Data ---
-    print("\n--- Loading and Preparing Data ---")
+    X = lagged.values.reshape(-1, 1)
+    Y = delta.values
+
+    if len(X) == 0:
+        return np.inf
+
     try:
-        df_a = pd.read_csv(f'data/{symbol_a.replace("/", "_")}_1h.csv', index_col="timestamp", parse_dates=True)
-        df_b = pd.read_csv(f'data/{symbol_b.replace("/", "_")}_1h.csv', index_col="timestamp", parse_dates=True)
-    except FileNotFoundError as e:
-        print(f"Error: {e}. Run collect_data.py for both symbols from {start_year} first.")
-        return
+        model = np.linalg.lstsq(X, Y, rcond=None)
+        lambda_ = model[0][0]
+    except np.linalg.LinAlgError:
+        return np.inf
 
-    df = pd.concat([df_a["close"], df_b["close"]], axis=1, keys=[symbol_a, symbol_b])
-    df.dropna(inplace=True)
+    if lambda_ >= 0:
+        return np.inf
+    return -np.log(2) / lambda_
 
-    # Filter data from the specified start year
-    df = df[df.index.year >= start_year]
 
-    # --- 2. Pre-calculate Strategy Indicators (Vectorized) ---
-    print("--- Pre-calculating Indicators (Cointegration, Z-Score)... ---")
+# --- CHANGE: Function now accepts symbol_a and symbol_b as arguments ---
+def run_pairs_backtest(symbol_a, symbol_b, start_year):
+    print(f"--- Starting Professional Pairs Trading Backtest for {symbol_a} / {symbol_b} ---")
 
-    # Rolling Cointegration (this is the slowest part)
-    p_values = pd.Series(index=df.index, dtype=float)
-    for i in tqdm(range(COINT_WINDOW, len(df)), desc="Calculating Rolling Cointegration"):
-        window = df.iloc[i - COINT_WINDOW : i]
-        _, p_value, _ = coint(window[symbol_a], window[symbol_b])
-        p_values.iloc[i] = p_value
-    df["p_value"] = p_values
-    df["is_tradeable"] = df["p_value"] < 0.05
+    # --- CHANGE: Cache file name is now dynamic ---
+    cache_file = f"data/precalculated_pro_{symbol_a.replace('/', '_')}_{symbol_b.replace('/', '_')}_{start_year}.pkl"
+    if os.path.exists(cache_file):
+        print("\n--- Loading Pre-calculated Data from Cache ---")
+        df = pd.read_pickle(cache_file)
+    else:
+        print("\n--- Loading Data & Pre-calculating Indicators ---")
+        try:
+            # --- CHANGE: Data is loaded using dynamic symbol names ---
+            df_a = pd.read_csv(f'data/{symbol_a.replace("/", "_")}_1h.csv', index_col="timestamp", parse_dates=True)
+            df_b = pd.read_csv(f'data/{symbol_b.replace("/", "_")}_1h.csv', index_col="timestamp", parse_dates=True)
+        except FileNotFoundError as e:
+            print(f"Error: {e}. Please run collect_data.py for both symbols from {start_year} first.")
+            return
 
-    # Z-Score Calculation
-    df["ratio"] = df[symbol_a] / df[symbol_b]
-    df["moving_average"] = df["ratio"].rolling(window=ZSCORE_LOOKBACK).mean()
-    df["std_dev"] = df["ratio"].rolling(window=ZSCORE_LOOKBACK).std()
-    df["z_score"] = (df["ratio"] - df["moving_average"]) / df["std_dev"]
+        df = pd.concat([df_a["close"], df_b["close"]], axis=1, keys=[symbol_a, symbol_b]).dropna()
+        df = df[df.index.year >= start_year]
 
-    # Drop initial rows with NaN values from rolling calculations
-    df.dropna(inplace=True)
+        p_values = pd.Series(index=df.index, dtype=float)
+        for i in tqdm(range(COINT_WINDOW, len(df)), desc="Calculating Rolling Cointegration"):
+            window = df.iloc[i - COINT_WINDOW : i]
+            _, p_value, _ = coint(window[symbol_a], window[symbol_b])
+            p_values.iloc[i] = p_value
+        df["p_value"] = p_values
+        df["is_tradeable"] = df["p_value"] < 0.05
 
-    # --- 3. Simulation Setup ---
+        returns_a = df[symbol_a].pct_change()
+        returns_b = df[symbol_b].pct_change()
+        df["beta"] = returns_a.rolling(window=BETA_WINDOW).cov(returns_b) / returns_b.rolling(window=BETA_WINDOW).var()
+        df["spread"] = df[symbol_a] - df["beta"] * df[symbol_b]
+
+        df["spread_mean"] = df["spread"].ewm(span=ZSCORE_LOOKBACK).mean()
+        df["spread_std"] = df["spread"].ewm(span=ZSCORE_LOOKBACK).std()
+        df["z_score"] = (df["spread"] - df["spread_mean"]) / df["spread_std"]
+
+        half_lives = pd.Series(index=df.index, dtype=float)
+        for i in tqdm(range(TIME_STOP_LOOKBACK, len(df)), desc="Calculating Rolling Half-Life"):
+            window = df["spread"].iloc[i - TIME_STOP_LOOKBACK : i]
+            half_lives.iloc[i] = calculate_half_life(window)
+        df["half_life"] = half_lives
+
+        df.dropna(inplace=True)
+        df.to_pickle(cache_file)
+        print(f"--- Pre-calculated data saved to {cache_file} ---")
+
     print("\n--- Running Simulation ---")
+
     cash = INITIAL_CAPITAL
-    position = None  # Can be 'LONG' (long A, short B) or 'SHORT' (short A, long B)
+    holdings_a = 0.0
+    holdings_b = 0.0
+    position = None
+    open_trade_details = {}
+
     trades = []
-    equity = pd.Series(index=df.index, dtype=float).fillna(INITIAL_CAPITAL)
+    equity_curve = []
 
-    # --- 4. Main Simulation Loop ---
     for i, row in tqdm(df.iterrows(), total=len(df), desc="Simulating Trades"):
-        # Copy previous equity value
-        equity.loc[i] = equity.iloc[equity.index.get_loc(i) - 1] if equity.index.get_loc(i) > 0 else INITIAL_CAPITAL
+        current_equity = cash + (holdings_a * row[symbol_a]) + (holdings_b * row[symbol_b])
+        equity_curve.append(current_equity)
 
-        # --- Position Management (Exits) ---
         if position:
-            pnl = 0
-            # Check for stop-loss
-            if (position == "LONG" and row["z_score"] < -STOP_LOSS_ZSCORE) or (
-                position == "SHORT" and row["z_score"] > STOP_LOSS_ZSCORE
-            ):
-                pnl = close_position(position, row, open_trade)
-                print_trade(i, "STOP LOSS", pnl, cash + pnl)
-                cash += pnl
-                trades.append(pnl)
-                position = None
+            open_trade_details["age"] += 1
+            exit_signal, reason = False, ""
 
-            # Check for exit signal (reversion to mean)
+            if (position == "LONG" and row["z_score"] <= -STOP_LOSS_ZSCORE) or (
+                position == "SHORT" and row["z_score"] >= STOP_LOSS_ZSCORE
+            ):
+                exit_signal, reason = True, "STOP LOSS"
+            elif open_trade_details["age"] > open_trade_details["time_limit"]:
+                exit_signal, reason = True, "TIME STOP"
             elif (position == "LONG" and row["z_score"] >= EXIT_ZSCORE) or (
                 position == "SHORT" and row["z_score"] <= EXIT_ZSCORE
             ):
-                pnl = close_position(position, row, open_trade)
-                print_trade(i, "TAKE PROFIT", pnl, cash + pnl)
-                cash += pnl
-                trades.append(pnl)
-                position = None
+                exit_signal, reason = True, "TAKE PROFIT"
 
-        # --- Entry Logic ---
+            if exit_signal:
+                pnl = current_equity - open_trade_details["entry_equity"]
+
+                if position == "LONG":
+                    cash += holdings_a * row[symbol_a] * (1 - SLIPPAGE) * (1 - TRANSACTION_FEE)
+                    cash -= abs(holdings_b) * row[symbol_b] * (1 + SLIPPAGE) * (1 + TRANSACTION_FEE)
+                else:
+                    cash -= abs(holdings_a) * row[symbol_a] * (1 + SLIPPAGE) * (1 + TRANSACTION_FEE)
+                    cash += holdings_b * row[symbol_b] * (1 - SLIPPAGE) * (1 - TRANSACTION_FEE)
+
+                trades.append({"pnl": pnl, "reason": reason})
+                position, holdings_a, holdings_b = None, 0.0, 0.0
+
         if not position and row["is_tradeable"]:
-            # Signal to go LONG the pair (Buy A, Sell B)
-            if row["z_score"] < -ENTRY_ZSCORE:
-                position = "LONG"
-                open_trade = open_position("LONG", row)
-                print_trade(i, "ENTER LONG", 0, cash)
+            enter_long = row["z_score"] <= -ENTRY_ZSCORE
+            enter_short = row["z_score"] >= ENTRY_ZSCORE
 
-            # Signal to go SHORT the pair (Sell A, Buy B)
-            elif row["z_score"] > ENTRY_ZSCORE:
-                position = "SHORT"
-                open_trade = open_position("SHORT", row)
-                print_trade(i, "ENTER SHORT", 0, cash)
+            if enter_long or enter_short:
+                dollar_risk = current_equity * RISK_PER_TRADE_PCT
+                stop_loss_spread = (
+                    row["spread_mean"] - (row["spread_std"] * STOP_LOSS_ZSCORE)
+                    if enter_long
+                    else row["spread_mean"] + (row["spread_std"] * STOP_LOSS_ZSCORE)
+                )
+                risk_per_unit = abs(row["spread"] - stop_loss_spread)
 
-        # Update equity with PnL from this step
-        if position:
-            current_pnl = calculate_unrealized_pnl(position, row, open_trade)
-            equity.loc[i] = cash + current_pnl
-        else:
-            equity.loc[i] = cash
+                if risk_per_unit > 0:
+                    size_b = dollar_risk / risk_per_unit
+                    size_a = size_b * row["beta"]
+                    value_a, value_b = size_a * row[symbol_a], size_b * row[symbol_b]
+                    total_value = value_a + value_b
 
-    # --- Helper functions for PnL calculation with costs ---
-    def open_position(pos_type, row):
-        price_a = row[symbol_a] * (1 + SLIPPAGE) if pos_type == "LONG" else row[symbol_a] * (1 - SLIPPAGE)
-        price_b = row[symbol_b] * (1 - SLIPPAGE) if pos_type == "LONG" else row[symbol_b] * (1 + SLIPPAGE)
+                    if current_equity > total_value:
+                        position = "LONG" if enter_long else "SHORT"
+                        if position == "LONG":
+                            holdings_a = size_a
+                            holdings_b = -size_b
+                        else:
+                            holdings_a = -size_a
+                            holdings_b = size_b
 
-        size_a = TRADE_VALUE / price_a
-        size_b = TRADE_VALUE / price_b
+                        cash_change_a = holdings_a * row[symbol_a] * (1 + (np.sign(holdings_a) * SLIPPAGE))
+                        cash_change_b = holdings_b * row[symbol_b] * (1 + (np.sign(holdings_b) * SLIPPAGE))
+                        fees = (abs(cash_change_a) + abs(cash_change_b)) * TRANSACTION_FEE
+                        cash -= cash_change_a + cash_change_b + fees
 
-        cost_a = size_a * price_a * (1 + TRANSACTION_FEE)
-        cost_b = size_b * price_b * (1 + TRANSACTION_FEE)
+                        open_trade_details = {
+                            "entry_equity": current_equity,
+                            "age": 0,
+                            "time_limit": (
+                                row["half_life"] * MAX_HOLDING_PERIOD_MULTIPLIER
+                                if np.isfinite(row["half_life"])
+                                else 1000
+                            ),
+                        }
 
-        return {
-            "price_a": price_a,
-            "price_b": price_b,
-            "size_a": size_a,
-            "size_b": size_b,
-            "initial_value": (cost_a - cost_b) if pos_type == "LONG" else (cost_b - cost_a),
-        }
-
-    def close_position(pos_type, row, trade_info):
-        # Opposite slippage on close
-        price_a = row[symbol_a] * (1 - SLIPPAGE) if pos_type == "LONG" else row[symbol_a] * (1 + SLIPPAGE)
-        price_b = row[symbol_b] * (1 + SLIPPAGE) if pos_type == "LONG" else row[symbol_b] * (1 - SLIPPAGE)
-
-        value_a = trade_info["size_a"] * price_a * (1 - TRANSACTION_FEE)
-        value_b = trade_info["size_b"] * price_b * (1 - TRANSACTION_FEE)
-
-        if pos_type == "LONG":  # Bought A, Sold B
-            pnl_a = value_a - (trade_info["size_a"] * trade_info["price_a"])
-            pnl_b = (trade_info["size_b"] * trade_info["price_b"]) - value_b  # Profit from shorting
-        else:  # Sold A, Bought B
-            pnl_a = (trade_info["size_a"] * trade_info["price_a"]) - value_a
-            pnl_b = value_b - (trade_info["size_b"] * trade_info["price_b"])
-
-        return pnl_a + pnl_b
-
-    def calculate_unrealized_pnl(pos_type, row, trade_info):
-        price_a = row[symbol_a]
-        price_b = row[symbol_b]
-
-        current_value_a = trade_info["size_a"] * price_a
-        current_value_b = trade_info["size_b"] * price_b
-
-        initial_value_a = trade_info["size_a"] * trade_info["price_a"]
-        initial_value_b = trade_info["size_b"] * trade_info["price_b"]
-
-        if pos_type == "LONG":
-            pnl_a = current_value_a - initial_value_a
-            pnl_b = initial_value_b - current_value_b
-        else:
-            pnl_a = initial_value_a - current_value_a
-            pnl_b = current_value_b - initial_value_b
-
-        return pnl_a + pnl_b
-
-    def print_trade(timestamp, event, pnl, current_cash):
-        print(f"{timestamp.strftime('%Y-%m-%d %H:%M')} | {event:<12} | PnL: ${pnl:7.2f} | Cash: ${current_cash:10.2f}")
-
-    # --- 5. Performance Analysis ---
-    print("\n--- Pairs Trading Backtest Finished ---")
+    print(f"\n--- Backtest Finished for {symbol_a}/{symbol_b} ---")
     if not trades:
         print("No trades were executed.")
         return
 
-    trades = pd.Series(trades)
+    trades_df = pd.DataFrame(trades)
+    equity = pd.Series(equity_curve, index=df.index)
 
-    # Calculate Metrics
-    net_profit = trades.sum()
+    net_profit = trades_df["pnl"].sum()
     total_return = (net_profit / INITIAL_CAPITAL) * 100
-    wins = trades[trades > 0]
-    losses = trades[trades <= 0]
-    win_rate = (len(wins) / len(trades)) * 100 if trades.any() else 0
-    profit_factor = wins.sum() / abs(losses.sum()) if losses.any() else float("inf")
-
+    wins = trades_df[trades_df["pnl"] > 0]
+    losses = trades_df[trades_df["pnl"] <= 0]
+    win_rate = (len(wins) / len(trades_df)) * 100 if not trades_df.empty else 0
+    profit_factor = (
+        wins["pnl"].sum() / abs(losses["pnl"].sum()) if not losses.empty and losses["pnl"].sum() != 0 else float("inf")
+    )
     daily_returns = equity.resample("D").last().pct_change().dropna()
     sharpe_ratio = (daily_returns.mean() / daily_returns.std()) * np.sqrt(365) if daily_returns.std() > 0 else 0
-
     running_max = equity.cummax()
     drawdown = (equity - running_max) / running_max
     max_drawdown = abs(drawdown.min()) * 100
 
-    # Print Report
     print("\n--- Performance Report ---")
+    print(f"Pair: {symbol_a} / {symbol_b}")
     print(f"Total Net Profit: ${net_profit:,.2f} ({total_return:.2f}%)")
     print(f"Sharpe Ratio: {sharpe_ratio:.2f}")
     print(f"Max Drawdown: {max_drawdown:.2f}%")
     print(f"Profit Factor: {profit_factor:.2f}")
-    print(f"Total Trades: {len(trades)}")
+    print(f"Total Trades: {len(trades_df)}")
     print(f"Win Rate: {win_rate:.2f}%")
 
-    # Plot Equity Curve
     plt.figure(figsize=(15, 7))
     equity.plot()
-    plt.title(f"{symbol_a}/{symbol_b} Pairs Trading Equity Curve")
+    # --- CHANGE: Plot title is now dynamic ---
+    plt.title(f"{symbol_a}/{symbol_b} Professional Pairs Trading Equity Curve")
     plt.xlabel("Date")
     plt.ylabel("Portfolio Value ($)")
     plt.grid(True)
-    plot_filename = f"research_results/{symbol_a.replace('/', '_')}_{symbol_b.replace('/', '_')}_equity_curve.png"
+    # --- CHANGE: Plot filename is now dynamic ---
+    plot_filename = f"research_results/{symbol_a.replace('/', '_')}_{symbol_b.replace('/', '_')}_pro_equity_curve.png"
     plt.savefig(plot_filename)
-    plt.show()
+    # --- CHANGE: We can hide the plot popup for batch processing ---
+    # plt.show()
+    plt.close()  # Close the plot to prevent it from displaying in a loop
+    print(f"Equity curve saved to {plot_filename}")
 
 
 if __name__ == "__main__":
-    sym_a = sys.argv[1] if len(sys.argv) > 1 else SYMBOL_A
-    sym_b = sys.argv[2] if len(sys.argv) > 2 else SYMBOL_B
-    s_year = int(sys.argv[3]) if len(sys.argv) > 3 else START_YEAR
+    # --- CHANGE: Read symbols from command-line arguments ---
+    if len(sys.argv) != 3:
+        print("Usage: python src/pairs_backtester.py <SYMBOL_A> <SYMBOL_B>")
+        print("Example: python src/pairs_backtester.py ETH/USDT BTC/USDT")
+        sys.exit(1)
 
-    run_pairs_backtest(sym_a, sym_b, s_year)
+    symbol_a_arg = sys.argv[1]
+    symbol_b_arg = sys.argv[2]
+
+    # Run the backtest
+    run_pairs_backtest(symbol_a_arg, symbol_b_arg, START_YEAR)

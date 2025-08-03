@@ -1,10 +1,11 @@
-# src/live_trader.py (Version 3.0 - Final Paper Trader Assembly)
+# src/live_trader.py (Version 3.1 - With PnL Simulation & Heartbeat)
 
 import ccxt
 import time
 from dotenv import load_dotenv
 import os
 import sys
+import datetime
 
 # Add parent directory to path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -19,6 +20,9 @@ from src.bot.notifier import Notifier
 # --- Configuration ---
 LOOP_INTERVAL_SECONDS = 60
 STARTING_CAPITAL_USD = 100.0
+# Costs are now defined in the main script to be passed to the PnL calculation
+ROUND_TRIP_FEES = 0.001 * 4
+ROUND_TRIP_SLIPPAGE = 0.0005 * 2
 
 
 def create_exchange(use_testnet=True):
@@ -40,7 +44,7 @@ def create_exchange(use_testnet=True):
 
 def main():
     load_dotenv()
-    print("--- Initializing Project Chimera: Live Paper Trader (V3.0) ---")
+    print("--- Initializing Project Chimera: Live Paper Trader (V3.1) ---")
 
     # Initialize Core Components
     notifier = Notifier()
@@ -53,7 +57,10 @@ def main():
     is_in_position = False
     open_position = {}
 
-    notifier.send_message("🤖 **Project Chimera** Paper Trader INITIALIZED. Starting loop.")
+    # Variables for heartbeat and PnL simulation
+    last_heartbeat_time = time.time()
+
+    notifier.send_message("🤖 **Project Chimera (V3.1)** Paper Trader INITIALIZED. Starting loop.")
 
     # The main bot loop
     while True:
@@ -61,21 +68,27 @@ def main():
         print(f"Loop start. State: {'IN_POSITION' if is_in_position else 'IDLE'}. Capital: ${current_capital:.2f}")
 
         try:
-            # 1. RISK CHECK (Top Priority)
+            # 1. RISK CHECK
             if not risk_manager.check(current_capital):
                 print("Risk check failed. Shutting down.")
                 break
 
+            # --- HEARTBEAT LOGIC ---
+            if time.time() - last_heartbeat_time > 86400:  # 86400 seconds = 24 hours
+                heartbeat_msg = (
+                    f"❤️ BOT ALIVE.\n"
+                    f"Capital: ${current_capital:.2f}\n"
+                    f"State: {'IN_POSITION with ' + open_position.get('symbol', '') if is_in_position else 'IDLE'}"
+                )
+                notifier.send_message(heartbeat_msg)
+                last_heartbeat_time = time.time()
+
+            # --- MAIN TRADING LOGIC ---
             if not is_in_position:
-                # 2. CHECK FOR ENTRY SIGNALS
                 signals = strategy.check_entry_signals(current_capital)
-
                 if signals:
-                    # 3. SIZE THE POSITION (Opportunistic Single Trade)
                     sized_order = select_and_size_position(signals, current_capital, exchange)
-
                     if sized_order:
-                        # 4. LOG INTENDED ENTRY
                         log_message = (
                             f"📈 PAPER ENTRY:\n"
                             f"Symbol: {sized_order['symbol']}\n"
@@ -84,23 +97,47 @@ def main():
                         print(log_message)
                         notifier.send_message(log_message)
 
-                        # Simulate the state transition (we assume perfect execution for paper trading)
                         is_in_position = True
                         open_position = sized_order
-                        ledger.log_trade("ENTER", sized_order, current_capital)
-
+                        open_position["entry_time"] = datetime.datetime.now()
+                        open_position["entry_capital"] = current_capital
+                        ledger.log_trade("ENTER", open_position, current_capital)
             else:
-                # 5. MANAGE OPEN POSITION & CHECK EXIT SIGNALS
-                print("Managing open position...")
+                # Get the current funding rate to simulate PnL
+                perp_symbol = f"{open_position['symbol'].split('/')[0]}/USDT:USDT"
+                rate_data = exchange.fetch_funding_rate(perp_symbol)
+                current_funding_rate = rate_data.get("fundingRate", 0.0)
+
+                # Simulate the profit from this funding period
+                funding_pnl = open_position["notional_value_usd"] * current_funding_rate
+                current_capital += funding_pnl
+
+                print(f"Managing open position... Funding PnL for this period: ${funding_pnl:.4f}")
+
                 if strategy.check_exit_signal(open_position):
-                    # 6. LOG INTENDED EXIT
-                    log_message = f"📉 PAPER EXIT:\nSymbol: {open_position['symbol']}"
+                    # --- PNL SIMULATION & EXIT LOGIC ---
+                    entry_capital = open_position["entry_capital"]
+                    trade_pnl = current_capital - entry_capital
+
+                    # Subtract estimated costs for the round trip
+                    trade_costs = open_position["notional_value_usd"] * (ROUND_TRIP_FEES + ROUND_TRIP_SLIPPAGE)
+                    net_pnl = trade_pnl - trade_costs
+
+                    # Final capital update
+                    current_capital = entry_capital + net_pnl
+
+                    holding_time = datetime.datetime.now() - open_position["entry_time"]
+
+                    log_message = (
+                        f"📉 PAPER EXIT:\n"
+                        f"Symbol: {open_position['symbol']}\n"
+                        f"Net PnL: ${net_pnl:.2f} (Costs: ~${trade_costs:.2f})\n"
+                        f"Held for: {str(holding_time).split('.')[0]}"
+                    )
                     print(log_message)
                     notifier.send_message(log_message)
 
-                    # Simulate exiting the position
-                    # NOTE: In V3.0 we simulate PnL and update capital here
-                    # For now, we will simply log the trade
+                    open_position["trade_pnl"] = net_pnl
                     ledger.log_trade("EXIT", open_position, current_capital)
 
                     is_in_position = False
@@ -110,7 +147,6 @@ def main():
             error_message = f"🚨 CRITICAL ERROR in main loop: {e}"
             print(error_message)
             notifier.send_message(error_message)
-            # Implement the mentor's global shutdown logic here if needed.
 
         print(f"Loop finished. Sleeping for {LOOP_INTERVAL_SECONDS} seconds...")
         time.sleep(LOOP_INTERVAL_SECONDS)

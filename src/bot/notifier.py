@@ -1,6 +1,6 @@
 import requests
 import os
-from .logger import logger
+from src.bot.logger import logger
 
 
 class Notifier:
@@ -11,9 +11,7 @@ class Notifier:
         self.last_update_id = 0
 
         if not self.token or not self.chat_id:
-            logger.warning(
-                "Notifier: Telegram credentials not found. Notifications disabled."
-            )
+            logger.warning("Notifier: Telegram credentials not found. Notifications disabled.")
             self.enabled = False
         else:
             logger.info("Notifier: Initialized with Telegram credentials.")
@@ -30,9 +28,7 @@ class Notifier:
         try:
             response = requests.post(url, json=payload)
             if response.status_code != 200:
-                logger.error(
-                    f"Notifier Error: Failed to send message. Response: {response.text}"
-                )
+                logger.error(f"Notifier Error: Failed to send message. Response: {response.text}")
         except Exception as e:
             logger.error(f"Notifier Error: Could not send message. {e}")
 

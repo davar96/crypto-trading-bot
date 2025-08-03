@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 # --- CHANGE: Symbols are now passed as arguments, removed hardcoded symbols ---
 START_YEAR = 2021
 # -- Strategy Parameters --
-COINT_WINDOW = 250 * 24
+COINT_WINDOW = 60 * 24
 ZSCORE_LOOKBACK = 50
 BETA_WINDOW = 100
 ENTRY_ZSCORE = 2.0

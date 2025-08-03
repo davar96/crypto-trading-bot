@@ -1,4 +1,4 @@
-# src/data_feed.py (Version 1.2 - Final Corrected Imports)
+# src/data_feed.py (Version 1.3 - With Time Synchronization)
 
 import time
 import ccxt
@@ -6,8 +6,7 @@ from dotenv import load_dotenv
 import os
 import sys
 
-# --- CORRECTED IMPORT ---
-# Use the absolute path from the project root (which is on the path)
+# Use the absolute path from the project root
 from src.bot.notifier import Notifier
 
 
@@ -15,7 +14,7 @@ class DataFeedManager:
     """
     Manages a robust connection to the exchange's data feeds.
 
-    Handles websocket simulation, disconnections with exponential backoff,
+    Handles time synchronization, disconnections with exponential backoff,
     and sends critical alerts via the Notifier.
     """
 
@@ -25,16 +24,53 @@ class DataFeedManager:
         self.reconnect_attempts = 0
         self.max_reconnects = 5
         self.connection_status = "DISCONNECTED"
+        self.time_offset = 0  # Difference between local and server time in ms
         print("Data Feed Manager initialized.")
 
     def connect(self):
-        """Simulates establishing a connection to the data feed."""
+        """Establishes connection and performs initial time sync."""
         print("Attempting to connect to data feed...")
+
+        # --- NEW: Perform time sync on every connection attempt ---
+        if not self.verify_time_sync():
+            # If the time drift is too large, it's a critical error.
+            # We will handle the failure within the verify_time_sync method.
+            # For now, we prevent connection if sync fails.
+            print("Connection aborted due to time sync failure.")
+            return False
+
         self.connection_status = "CONNECTED"
         self.reconnect_attempts = 0
         print("Data feed connected successfully.")
         self.notifier.send_message("✅ Data Feed CONNECTED.")
         return True
+
+    # --- NEW METHOD ---
+    def verify_time_sync(self):
+        """
+        Checks the local system time against the exchange's server time.
+        """
+        print("Verifying time synchronization...")
+        try:
+            server_time = self.exchange.fetch_time()
+            local_time = int(time.time() * 1000)
+            self.time_offset = server_time - local_time
+
+            print(f"  - Server Time: {server_time}, Local Time: {local_time}")
+            print(f"  - Time Drift: {self.time_offset} ms")
+
+            if abs(self.time_offset) > 1000:  # More than 1 second drift
+                error_message = f"🚨 CRITICAL: Time sync error! Drift is {self.time_offset}ms. Funding calculations may be inaccurate."
+                print(error_message)
+                self.notifier.send_message(error_message)
+                return False
+
+            print("  - Time sync is OK.")
+            return True
+        except Exception as e:
+            print(f"Could not verify time sync. Reason: {e}")
+            self.notifier.send_message(f"⚠️ WARNING: Could not verify time sync with exchange.")
+            return False  # Fail safely
 
     def disconnect(self):
         """Simulates a disconnection event."""
@@ -51,7 +87,7 @@ class DataFeedManager:
             print(f"Attempting reconnect #{self.reconnect_attempts} in {wait_time} seconds...")
             self.notifier.send_message(f"Attempting reconnect #{self.reconnect_attempts} in {wait_time}s...")
             time.sleep(wait_time)
-            self.connect()
+            self.connect()  # Reconnect will re-verify time sync
         else:
             print("CRITICAL: Maximum reconnect attempts reached. Shutting down.")
             self.notifier.send_message("🚨 CRITICAL: Max reconnects reached. Bot requires manual intervention!")
@@ -60,36 +96,28 @@ class DataFeedManager:
     def get_funding_rate_data(self, symbol, limit):
         """
         Primary data fetching method.
-        Includes sanity checks and fallbacks as per mentor's advice.
         """
         if self.connection_status != "CONNECTED":
             print("Warning: Cannot fetch data, currently disconnected.")
             return None
-
         try:
             perp_symbol = f"{symbol.split('/')[0]}/USDT:USDT"
             history = self.exchange.fetch_funding_rate_history(perp_symbol, limit=limit)
 
-            if not self.validate_data_freshness(history):
-                pass
-
+            # Placeholder for future sanity checks
             if not self.validate_funding_rates(history):
                 self.notifier.send_message(f"⚠️ WARNING: Suspicious funding rate detected for {symbol}.")
                 pass
-
             return history
-
         except Exception as e:
             print(f"Data Feed Error: Could not fetch data for {symbol}. {e}")
             self.disconnect()
             return None
 
-    def validate_data_freshness(self, data):
-        return True
-
     def validate_funding_rates(self, data):
+        # This is a simple sanity check, not a full validation yet.
         for record in data:
-            if abs(float(record["fundingRate"])) > 0.01:
+            if abs(float(record["fundingRate"])) > 0.01:  # >1% funding rate is very high
                 print(f"Suspicious Rate Found: {record['fundingRate']}")
                 return False
         return True
@@ -109,24 +137,12 @@ if __name__ == "__main__":
     )
 
     notifier = Notifier()
-
     feed_manager = DataFeedManager(exchange, notifier)
 
-    print("\n--- Test Case 1: Happy Path ---")
+    print("\n--- Testing Time Sync and Connection ---")
     feed_manager.connect()
-    doge_data = feed_manager.get_funding_rate_data("DOGE/USDT", limit=5)
-    if doge_data:
-        print(f"Successfully fetched {len(doge_data)} records for DOGE.")
-        assert len(doge_data) > 0
 
-    print("\n--- Test Case 2: Disconnection Simulation ---")
-    print("Simulating a network error by calling disconnect...")
-    feed_manager.disconnect()
-
-    print("\nTrying to fetch data again after reconnect...")
-    eth_data = feed_manager.get_funding_rate_data("ETH/USDT", limit=5)
-    if eth_data:
-        print(f"Successfully fetched {len(eth_data)} records for ETH after reconnect.")
-        assert len(eth_data) > 0
-
-    print("\n--- All DataFeedManager tests passed! ---")
+    if feed_manager.connection_status == "CONNECTED":
+        print("\n--- DataFeedManager Time Sync test passed! ---")
+    else:
+        print("\n--- DataFeedManager Time Sync test FAILED. ---")

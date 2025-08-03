@@ -8,7 +8,7 @@ import sys
 
 # Add the parent directory to the path to allow importing the backtester
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from funding_arb_backtester import run_funding_arb_backtest
+from src.research.funding_arb_backtester import run_funding_arb_backtest
 
 # --- Configuration ---
 SYMBOL_TO_OPTIMIZE = "DOGE/USDT"

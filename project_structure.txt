@@ -7,204 +7,40 @@
 |   .env
 |   .env.example
 |   .gitignore
-|   backtest_results.log
-|   backtest_results_volume.log
 |   README.md
 |   requirements.txt
     |   settings.json
-    |   AAVE_USDT_1h.csv
-    |   AAVE_USDT_5m.csv
-    |   ADA_USDT_1h.csv
-    |   ADA_USDT_5m.csv
-    |   ATOM_USDT_1h.csv
-    |   ATOM_USDT_5m.csv
-    |   AVAX_USDT_1h.csv
-    |   AVAX_USDT_5m.csv
-    |   BCH_USDT_1h.csv
-    |   BCH_USDT_5m.csv
-    |   BNB_USDT_1h.csv
     |   BNB_USDT_1h_ohlcv.csv
-    |   BNB_USDT_5m.csv
-    |   BNB_USDT_5m_ohlcv.csv
     |   BNB_USDT_funding_rates.csv
-    |   BTC_USDT_1h.csv
     |   BTC_USDT_1h_ohlcv.csv
-    |   BTC_USDT_5m.csv
-    |   BTC_USDT_5m_ohlcv.csv
     |   BTC_USDT_funding_rates.csv
-    |   DOGE_USDT_1h.csv
     |   DOGE_USDT_1h_ohlcv.csv
-    |   DOGE_USDT_5m.csv
-    |   DOGE_USDT_5m_ohlcv.csv
     |   DOGE_USDT_funding_rates.csv
-    |   DOT_USDT_1h.csv
-    |   DOT_USDT_5m.csv
-    |   ETH_USDT_1h.csv
     |   ETH_USDT_1h_ohlcv.csv
-    |   ETH_USDT_5m.csv
-    |   ETH_USDT_5m_ohlcv.csv
     |   ETH_USDT_funding_rates.csv
-    |   FTM_USDT_1h.csv
-    |   FTM_USDT_5m.csv
-    |   LINK_USDT_1h.csv
-    |   LINK_USDT_5m.csv
-    |   LTC_USDT_1h.csv
-    |   LTC_USDT_5m.csv
-    |   MATIC_USDT_1h.csv
-    |   MATIC_USDT_5m.csv
-    |   NEAR_USDT_1h.csv
-    |   NEAR_USDT_5m.csv
     |   paper_trade_log.csv
-    |   precalculated_pro_LINK_USDT_BNB_USDT_2021.pkl
-    |   RUNE_USDT_1h.csv
-    |   RUNE_USDT_5m.csv
-    |   SOL_USDT_1h.csv
     |   SOL_USDT_1h_ohlcv.csv
-    |   SOL_USDT_5m.csv
-    |   SOL_USDT_5m_ohlcv.csv
     |   SOL_USDT_funding_rates.csv
-    |   UNI_USDT_1h.csv
-    |   UNI_USDT_5m.csv
-    |   XRP_USDT_1h.csv
-    |   XRP_USDT_5m.csv
-    |   bot_20250719_084228.log
-    |   bot_20250719_085133.log
-    |   bot_20250719_091741.log
-    |   bot_20250719_092352.log
-    |   bot_20250719_092743.log
-    |   bot_20250719_093001.log
-    |   bot_20250719_094731.log
-    |   bot_20250719_095500.log
-    |   bot_20250719_095540.log
-    |   bot_20250719_111803.log
-    |   bot_20250719_112112.log
-    |   bot_20250719_143003.log
-    |   bot_20250719_143602.log
-    |   bot_20250719_150553.log
-    |   bot_20250720_155802.log
-    |   bot_20250720_160127.log
-    |   bot_20250721_103936.log
-    |   bot_20250721_201153.log
-    |   bot_20250722_092352.log
-    |   bot_20250723_095033.log
-    |   bot_20250723_095346.log
-    |   bot_20250723_230050.log
-    |   bot_20250724_093913.log
-    |   bot_20250724_231343.log
-    |   bot_20250726_001032.log
-    |   bot_20250726_132434.log
-    |   bot_20250726_143524.log
-    |   bot_20250726_143911.log
-    |   bot_20250726_151843.log
-    |   bot_20250726_152051.log
-    |   bot_20250726_232532.log
-    |   bot_20250727_222652.log
-    |   bot_20250727_235615.log
-    |   bot_20250729_183013.log
-    |   bot_20250729_183032.log
-    |   bot_20250729_183050.log
-    |   bot_20250729_183108.log
-    |   bot_20250729_183126.log
-    |   bot_20250729_183143.log
-    |   bot_20250729_183200.log
-    |   bot_20250729_183218.log
-    |   bot_20250729_183236.log
-    |   bot_20250729_183253.log
-    |   bot_20250729_183310.log
-    |   bot_20250729_183327.log
-    |   bot_20250729_183345.log
-    |   bot_20250729_183402.log
-    |   bot_20250729_183420.log
-    |   bot_20250729_183436.log
-    |   bot_20250729_183453.log
-    |   bot_20250729_183511.log
-    |   bot_20250729_194313.log
-    |   bot_20250729_194330.log
-    |   bot_20250729_194348.log
-    |   bot_20250729_194405.log
-    |   bot_20250729_194423.log
-    |   bot_20250729_194440.log
-    |   bot_20250729_194457.log
-    |   bot_20250729_194514.log
-    |   bot_20250729_194531.log
-    |   bot_20250729_194547.log
-    |   bot_20250729_194604.log
-    |   bot_20250729_194621.log
-    |   bot_20250729_194639.log
-    |   bot_20250729_194656.log
-    |   bot_20250729_194712.log
-    |   bot_20250729_194728.log
-    |   bot_20250729_194744.log
-    |   bot_20250729_194801.log
-    |   bot_20250803_161929.log
-    |   bot_20250803_163150.log
-    |   bot_20250803_164033.log
-    |   bot_20250803_164607.log
-    |   bot_20250803_173333.log
-    |   bot_20250803_180052.log
-    |   BTC_USDT_funding_arb_equity_curve.png
-    |   BTC_USDT_funding_arb_equity_curve_v2.1.png
-    |   BTC_USDT_funding_arb_equity_curve_v2.2.png
     |   BTC_USDT_funding_arb_equity_curve_v2.3.png
-    |   BTC_USDT_funding_arb_equity_curve_v2.png
-    |   ETH_USDT_BTC_USDT_analysis.png
-    |   ETH_USDT_BTC_USDT_beta_equity_curve.png
-    |   ETH_USDT_BTC_USDT_equity_curve.png
-    |   ETH_USDT_BTC_USDT_pro_equity_curve.png
-    |   ETH_USDT_BTC_USDT_rolling_analysis.png
-    |   LINK_USDT_BNB_USDT_pro_equity_curve.png
-    |   optimizer_report.csv
     |   optimizer_report_BNB.csv
     |   optimizer_report_DOGE.csv
     |   optimizer_report_ETH.csv
     |   optimizer_report_SOL.csv
-    |   screener_report.csv
     +---bot
     +---research
-    +---__pycache__
-    |   backtest.py
-    |   cleanup_oco.py
-    |   clean_testnet.py
     |   collect_data.py
     |   data_feed.py
-    |   emergency_cleanup.py
     |   execution.py
-    |   funding_arb_backtester.py
     |   ledger.py
     |   live_trader.py
-    |   main.py
-    |   pairs_backtester.py
     |   position_sizer.py
     |   risk_manager.py
-    |   run_all_backtests.py
     |   strategy.py
     |   __init__.py
-        +---__pycache__
         |   exchange_api.py
         |   logger.py
         |   notifier.py
-        |   state_manager.py
-        |   trading_bot.py
         |   __init__.py
-            |   exchange_api.cpython-310.pyc
-            |   logger.cpython-310.pyc
-            |   notifier.cpython-310.pyc
-            |   risk_manager.cpython-310.pyc
-            |   state_manager.cpython-310.pyc
-            |   strategy.cpython-310.pyc
-            |   trading_bot.cpython-310.pyc
-            |   __init__.cpython-310.pyc
-        |   analyze_pair.py
+        |   funding_arb_backtester.py
         |   funding_rate_scanner.py
         |   optimizer.py
-        |   pair_screener.py
-        |   data_feed.cpython-310.pyc
-        |   execution.cpython-310.pyc
-        |   funding_arb_backtester.cpython-310.pyc
-        |   ledger.cpython-310.pyc
-        |   live_trader.cpython-310.pyc
-        |   notifier.cpython-310.pyc
-        |   position_sizer.cpython-310.pyc
-        |   risk_manager.cpython-310.pyc
-        |   strategy.cpython-310.pyc
-        |   __init__.cpython-310.pyc

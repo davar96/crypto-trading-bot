@@ -26,9 +26,7 @@ class ExchangeAPI:
         try:
             return self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
         except Exception as e:
-            logger.error(
-                f"ExchangeAPI Error: Could not fetch market data for {symbol}. {e}"
-            )
+            logger.error(f"ExchangeAPI Error: Could not fetch market data for {symbol}. {e}")
             return []
 
     def get_current_price(self, symbol):
@@ -36,9 +34,7 @@ class ExchangeAPI:
             ticker = self.exchange.fetch_ticker(symbol)
             return ticker["last"]
         except Exception as e:
-            logger.error(
-                f"ExchangeAPI Error: Could not fetch current price for {symbol}. {e}"
-            )
+            logger.error(f"ExchangeAPI Error: Could not fetch current price for {symbol}. {e}")
             return 0
 
     def place_market_buy_order(self, symbol, amount):
@@ -51,9 +47,7 @@ class ExchangeAPI:
 
     def place_oco_order(self, symbol, amount, take_profit_price, stop_loss_price):
         """Places a One-Cancels-the-Other (OCO) order."""
-        logger.info(
-            f"ExchangeAPI: Placing OCO for {symbol} | TP: {take_profit_price}, SL: {stop_loss_price}"
-        )
+        logger.info(f"ExchangeAPI: Placing OCO for {symbol} | TP: {take_profit_price}, SL: {stop_loss_price}")
 
         # OCO orders require prices to be formatted to the exchange's precision rules
         tp_price_str = self.exchange.price_to_precision(symbol, take_profit_price)
@@ -75,9 +69,7 @@ class ExchangeAPI:
 
     def cancel_order_list(self, symbol, order_list_id):
         """Cancels an entire OCO order list."""
-        logger.info(
-            f"ExchangeAPI: Canceling OCO List with ID {order_list_id} for {symbol}"
-        )
+        logger.info(f"ExchangeAPI: Canceling OCO List with ID {order_list_id} for {symbol}")
         return self.exchange.private_delete_orderlist(
             {
                 "symbol": self.exchange.market_id(symbol),
@@ -92,15 +84,11 @@ class ExchangeAPI:
             # The unified method is great for this
             return self.exchange.cancel_all_orders(symbol)
         except Exception as e:
-            logger.error(
-                f"ExchangeAPI Error: Could not cancel all orders for {symbol}. {e}"
-            )
+            logger.error(f"ExchangeAPI Error: Could not cancel all orders for {symbol}. {e}")
 
     def place_stop_market_sell_order(self, symbol, amount, stop_price):
         """Places a standalone stop-market sell order."""
-        logger.info(
-            f"ExchangeAPI: Placing STOP-MARKET SELL for {amount} of {symbol} at trigger price ${stop_price}"
-        )
+        logger.info(f"ExchangeAPI: Placing STOP-MARKET SELL for {amount} of {symbol} at trigger price ${stop_price}")
 
         # Format amount and price to exchange precision
         amount_str = self.exchange.amount_to_precision(symbol, amount)
@@ -124,7 +112,5 @@ class ExchangeAPI:
         try:
             return self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
         except Exception as e:
-            logger.error(
-                f"ExchangeAPI Error: Could not fetch {timeframe} data for {symbol}. {e}"
-            )
+            logger.error(f"ExchangeAPI Error: Could not fetch {timeframe} data for {symbol}. {e}")
             return []

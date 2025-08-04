@@ -1,4 +1,4 @@
-# src/live_trader.py (Version 3.4 - Final Hardened Version)
+# src/live_trader.py (Version 3.5 - With Capital Persistence)
 
 import ccxt
 import time
@@ -43,36 +43,40 @@ def create_exchange(use_testnet=True):
 
 def main():
     load_dotenv()
-    logger.info("--- Initializing Project Chimera: Live Paper Trader (V3.4 - Hardened) ---")
+    logger.info("--- Initializing Project Chimera: Live Paper Trader (V3.5) ---")
 
     # Initialize Core Components
     notifier = Notifier()
     exchange = create_exchange(use_testnet=True)
-    risk_manager = RiskManager(exchange, STARTING_CAPITAL_USD, notifier)
-    strategy = FundingArbStrategy(exchange)
-    ledger = PaperTradingLedger()
     state_manager = StateManager()
 
-    current_capital = STARTING_CAPITAL_USD
+    # --- MODIFIED: Load capital first ---
+    current_capital = state_manager.load_capital(STARTING_CAPITAL_USD)
+
+    risk_manager = RiskManager(exchange, current_capital, notifier)  # Initialize with potentially recovered capital
+    strategy = FundingArbStrategy(exchange)
+    ledger = PaperTradingLedger()
+
     is_in_position = False
     open_position = {}
 
-    # Timers for periodic tasks
     last_heartbeat_time = time.time()
-    last_periodic_check = time.time()  # Combined timer for less frequent checks
+    last_periodic_check = time.time()
 
-    # State Recovery Logic
-    recovered_state = state_manager.load_state()
+    # --- STATE RECOVERY LOGIC ---
+    recovered_state = state_manager.load_position_state()
     if recovered_state:
-        logger.info("!!! RECOVERED STATE DETECTED !!!")
+        logger.info("!!! RECOVERED POSITION STATE DETECTED !!!")
         open_position = recovered_state
         is_in_position = True
-        current_capital = open_position.get("entry_capital", STARTING_CAPITAL_USD)
+        # On recovery, trust the loaded capital, but log the state's capital for comparison
+        logger.info(f"  - Capital from file: ${current_capital:.2f}")
+        logger.info(f"  - Entry capital from recovered position: ${open_position.get('entry_capital', 0.0):.2f}")
         notifier.send_message(
             f"🤖 **Project Chimera** RESTARTED & RECOVERED open position for {open_position.get('symbol')}."
         )
     else:
-        notifier.send_message("🤖 **Project Chimera (V3.4 - Hardened)** Paper Trader INITIALIZED.")
+        notifier.send_message("🤖 **Project Chimera (V3.5)** Paper Trader INITIALIZED.")
 
     while True:
         logger.info("\n----------------------------------")
@@ -81,15 +85,13 @@ def main():
         )
 
         try:
-            # 1. CAPITAL RISK CHECK (Every loop)
             if not risk_manager.check_capital(current_capital):
                 logger.critical("Capital risk check failed. Shutting down.")
                 break
 
-            # 2. PERIODIC CHECKS (Every 15 minutes)
-            if time.time() - last_periodic_check > 900:  # 900 seconds = 15 minutes
+            if time.time() - last_periodic_check > 900:
                 logger.info("Performing periodic checks (Memory, Exchange Status)...")
-                risk_manager.check_memory_usage()  # <-- NEW MEMORY CHECK
+                risk_manager.check_memory_usage()
                 if not risk_manager.check_exchange_status():
                     logger.warning("Exchange status is not OK. Skipping trading logic for this loop.")
                     last_periodic_check = time.time()
@@ -97,7 +99,6 @@ def main():
                     continue
                 last_periodic_check = time.time()
 
-            # 3. HEARTBEAT (Daily)
             if time.time() - last_heartbeat_time > 86400:
                 heartbeat_msg = (
                     f"❤️ BOT ALIVE.\n"
@@ -107,7 +108,6 @@ def main():
                 notifier.send_message(heartbeat_msg)
                 last_heartbeat_time = time.time()
 
-            # 4. MAIN TRADING LOGIC
             if not is_in_position:
                 signals = strategy.check_entry_signals(current_capital)
                 if signals:
@@ -126,7 +126,7 @@ def main():
                         open_position["entry_time"] = datetime.datetime.now().isoformat()
                         open_position["entry_capital"] = current_capital
                         ledger.log_trade("ENTER", open_position, current_capital)
-                        state_manager.save_state(open_position)
+                        state_manager.save_position_state(open_position)
             else:
                 perp_symbol = f"{open_position['symbol'].split('/')[0]}/USDT:USDT"
                 rate_data = exchange.fetch_funding_rate(perp_symbol)
@@ -156,7 +156,7 @@ def main():
 
                     open_position["trade_pnl"] = net_pnl
                     ledger.log_trade("EXIT", open_position, current_capital)
-                    state_manager.clear_state()
+                    state_manager.clear_position_state()
 
                     is_in_position = False
                     open_position = {}
@@ -164,6 +164,9 @@ def main():
         except Exception as e:
             logger.critical(f"CRITICAL ERROR in main loop: {e}", exc_info=True)
             notifier.send_message(f"🚨 CRITICAL ERROR in main loop: {e}")
+
+        # --- NEW: Save capital at the end of every loop ---
+        state_manager.save_capital(current_capital)
 
         logger.info(f"Loop finished. Sleeping for {LOOP_INTERVAL_SECONDS} seconds...")
         time.sleep(LOOP_INTERVAL_SECONDS)

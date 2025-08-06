@@ -1,4 +1,4 @@
-# src/position_sizer.py (Version 1.0)
+# src/position_sizer.py (Version 1.1 - Passes initial_apr)
 
 import ccxt
 from dotenv import load_dotenv
@@ -74,6 +74,8 @@ def select_and_size_position(signals, current_capital_usd, exchange):
         "notional_value_usd": notional_trade_value,
         "asset_quantity": asset_quantity,
         "asset_price": asset_price,
+        # --- MODIFIED: Added initial_apr for PnL calculation in live_trader ---
+        "initial_apr": best_signal["current_apr"],
     }
 
     print(f"Position Sizer: Final trade calculated: {final_trade}")
@@ -95,27 +97,30 @@ if __name__ == "__main__":
     mock_exchange = MockExchange()
 
     # --- Test Case 1: Single Signal, Sufficient Capital ---
-    print("\n--- Test Case 1: Single DOGE signal, €100 capital ---")
+    print("\n--- Test Case 1: Single DOGE signal, $100 capital ---")
     signals_1 = [{"symbol": "DOGE/USDT", "current_apr": 25.0, "action": "ENTER"}]
-    sized_trade_1 = select_and_size_position(signals_1, 100, mock_exchange)  # Using 100 USD for simplicity
+    sized_trade_1 = select_and_size_position(signals_1, 100, mock_exchange)
     assert sized_trade_1 is not None
     assert sized_trade_1["notional_value_usd"] == 60.0
+    assert "initial_apr" in sized_trade_1  # <-- NEW: Verify the key exists
+    assert sized_trade_1["initial_apr"] == 25.0  # <-- NEW: Verify the value is correct
 
     # --- Test Case 2: Multiple Signals, Sufficient Capital ---
-    print("\n--- Test Case 2: Multiple signals, €500 capital ---")
+    print("\n--- Test Case 2: Multiple signals, $500 capital ---")
     signals_2 = [
         {"symbol": "SOL/USDT", "current_apr": 18.0, "action": "ENTER"},
         {"symbol": "ETH/USDT", "current_apr": 22.0, "action": "ENTER"},  # ETH has higher APR
     ]
     sized_trade_2 = select_and_size_position(signals_2, 500, mock_exchange)
     assert sized_trade_2 is not None
-    assert sized_trade_2["symbol"] == "ETH/USDT"  # Should select ETH
+    assert sized_trade_2["symbol"] == "ETH/USDT"
     assert sized_trade_2["notional_value_usd"] == 350.0  # 70% of 500
+    assert sized_trade_2["initial_apr"] == 22.0  # <-- NEW: Verify correct APR was chosen
 
     # --- Test Case 3: Insufficient Capital ---
-    print("\n--- Test Case 3: Single signal, €30 capital (too low) ---")
+    print("\n--- Test Case 3: Single signal, $30 capital (too low) ---")
     signals_3 = [{"symbol": "DOGE/USDT", "current_apr": 25.0, "action": "ENTER"}]
     sized_trade_3 = select_and_size_position(signals_3, 30, mock_exchange)
-    assert sized_trade_3 is None  # Should return None
+    assert sized_trade_3 is None
 
-    print("\n--- All PositionSizer tests passed! ---")
+    print("\n--- All PositionSizer (V1.1) tests passed! ---")

@@ -1,4 +1,4 @@
-# src/live_trader.py (Version 3.5 - With Capital Persistence)
+# src/live_trader.py (Version 3.6 - Corrected PnL Logic)
 
 import ccxt
 import time
@@ -22,6 +22,7 @@ LOOP_INTERVAL_SECONDS = 60
 STARTING_CAPITAL_USD = 100.0
 ROUND_TRIP_FEES = 0.001 * 4
 ROUND_TRIP_SLIPPAGE = 0.0005 * 2
+FUNDING_PERIOD_HOURS = 8  # Binance standard is 8 hours
 
 
 def create_exchange(use_testnet=True):
@@ -43,17 +44,16 @@ def create_exchange(use_testnet=True):
 
 def main():
     load_dotenv()
-    logger.info("--- Initializing Project Chimera: Live Paper Trader (V3.5) ---")
+    logger.info("--- Initializing Project Chimera: Live Paper Trader (V3.6) ---")
 
     # Initialize Core Components
     notifier = Notifier()
     exchange = create_exchange(use_testnet=True)
     state_manager = StateManager()
 
-    # --- MODIFIED: Load capital first ---
     current_capital = state_manager.load_capital(STARTING_CAPITAL_USD)
 
-    risk_manager = RiskManager(exchange, current_capital, notifier)  # Initialize with potentially recovered capital
+    risk_manager = RiskManager(exchange, current_capital, notifier)
     strategy = FundingArbStrategy(exchange)
     ledger = PaperTradingLedger()
 
@@ -63,20 +63,19 @@ def main():
     last_heartbeat_time = time.time()
     last_periodic_check = time.time()
 
-    # --- STATE RECOVERY LOGIC ---
+    # --- STATE RECOVERY LOGIC (Unchanged) ---
     recovered_state = state_manager.load_position_state()
     if recovered_state:
         logger.info("!!! RECOVERED POSITION STATE DETECTED !!!")
         open_position = recovered_state
         is_in_position = True
-        # On recovery, trust the loaded capital, but log the state's capital for comparison
         logger.info(f"  - Capital from file: ${current_capital:.2f}")
         logger.info(f"  - Entry capital from recovered position: ${open_position.get('entry_capital', 0.0):.2f}")
         notifier.send_message(
             f"🤖 **Project Chimera** RESTARTED & RECOVERED open position for {open_position.get('symbol')}."
         )
     else:
-        notifier.send_message("🤖 **Project Chimera (V3.5)** Paper Trader INITIALIZED.")
+        notifier.send_message("🤖 **Project Chimera (V3.6)** Paper Trader INITIALIZED.")
 
     while True:
         logger.info("\n----------------------------------")
@@ -85,6 +84,7 @@ def main():
         )
 
         try:
+            # --- Capital and System Checks (Unchanged) ---
             if not risk_manager.check_capital(current_capital):
                 logger.critical("Capital risk check failed. Shutting down.")
                 break
@@ -108,6 +108,7 @@ def main():
                 notifier.send_message(heartbeat_msg)
                 last_heartbeat_time = time.time()
 
+            # --- ENTRY LOGIC (Unchanged) ---
             if not is_in_position:
                 signals = strategy.check_entry_signals(current_capital)
                 if signals:
@@ -128,28 +129,49 @@ def main():
                         ledger.log_trade("ENTER", open_position, current_capital)
                         state_manager.save_position_state(open_position)
             else:
-                perp_symbol = f"{open_position['symbol'].split('/')[0]}/USDT:USDT"
-                rate_data = exchange.fetch_funding_rate(perp_symbol)
-                current_funding_rate = rate_data.get("fundingRate", 0.0)
-                funding_pnl = open_position["notional_value_usd"] * current_funding_rate
-                current_capital += funding_pnl
-                logger.info(f"Managing open position... Funding PnL for this period: ${funding_pnl:.4f}")
+                # =================================================================
+                # --- BUG FIX: REMOVED INCORRECT PNL ACCRUAL ---
+                # The previous logic incorrectly added funding PnL on every loop.
+                # The correct approach is to do nothing here and calculate all PnL ONCE at exit.
+                logger.info(f"Managing open position for {open_position['symbol']}. Monitoring for exit signal...")
+                # =================================================================
 
                 if strategy.check_exit_signal(open_position):
+                    # =================================================================
+                    # --- BUG FIX: REBUILT PNL CALCULATION AT EXIT ---
+
+                    # 1. Get accurate entry and exit details
+                    entry_time = datetime.datetime.fromisoformat(open_position["entry_time"])
+                    exit_time = datetime.datetime.now()
+                    holding_duration = exit_time - entry_time
+                    holding_time_str = str(holding_duration).split(".")[0]
                     entry_capital = open_position["entry_capital"]
-                    trade_pnl = current_capital - entry_capital
-                    trade_costs = open_position["notional_value_usd"] * (ROUND_TRIP_FEES + ROUND_TRIP_SLIPPAGE)
-                    net_pnl = trade_pnl - trade_costs
+                    notional_value = open_position["notional_value_usd"]
+
+                    # 2. Determine how many funding payments were received
+                    # This is a robust way to count the number of 8-hour periods crossed
+                    num_funding_events = holding_duration.total_seconds() // (FUNDING_PERIOD_HOURS * 3600)
+
+                    # 3. Estimate total GROSS funding PnL
+                    # We use the initial APR as a conservative estimate for the average rate paid.
+                    initial_apr = open_position.get("initial_apr", 0.0)  # From position_sizer.py
+                    apr_per_period = (initial_apr / 100) / (365 * (24 / FUNDING_PERIOD_HOURS))
+                    gross_funding_pnl = notional_value * apr_per_period * num_funding_events
+
+                    # 4. Calculate total round-trip costs
+                    trade_costs = notional_value * (ROUND_TRIP_FEES + ROUND_TRIP_SLIPPAGE)
+
+                    # 5. Calculate Final Net PnL and New Capital
+                    net_pnl = gross_funding_pnl - trade_costs
+                    # THIS is the only place capital should be updated for a trade.
                     current_capital = entry_capital + net_pnl
-                    holding_time_str = str(
-                        datetime.datetime.now() - datetime.datetime.fromisoformat(open_position["entry_time"])
-                    ).split(".")[0]
 
                     log_message = (
                         f"📉 PAPER EXIT:\n"
                         f"Symbol: {open_position['symbol']}\n"
-                        f"Net PnL: ${net_pnl:.2f}\n"
-                        f"Held for: {holding_time_str}"
+                        f"Net PnL: ${net_pnl:.4f}\n"
+                        f"  (Gross Funding: ${gross_funding_pnl:.4f} | Costs: ${trade_costs:.4f})\n"
+                        f"Held for: {holding_time_str} ({int(num_funding_events)} funding payments)"
                     )
                     logger.info(log_message)
                     notifier.send_message(log_message)
@@ -160,12 +182,13 @@ def main():
 
                     is_in_position = False
                     open_position = {}
+                    # =================================================================
 
         except Exception as e:
             logger.critical(f"CRITICAL ERROR in main loop: {e}", exc_info=True)
             notifier.send_message(f"🚨 CRITICAL ERROR in main loop: {e}")
 
-        # --- NEW: Save capital at the end of every loop ---
+        # --- Capital Persistence (Unchanged) ---
         state_manager.save_capital(current_capital)
 
         logger.info(f"Loop finished. Sleeping for {LOOP_INTERVAL_SECONDS} seconds...")

@@ -1,415 +1,183 @@
-<div align="center">
+# Project Chimera: A Post-Mortem on Retail Algorithmic Trading
 
-# 🔥 Project Chimera
+### Or: How I Spent 300 Hours Learning That Retail Trading Is Dead
 
-### A Professional-Grade Cryptocurrency Funding Rate Arbitrage Bot
+## ⚠️ WARNING TO FUTURE DEVELOPERS
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
-[![CCXT](https://img.shields.io/badge/CCXT-Unified%20API-green.svg)](https://github.com/ccxt/ccxt)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)]()
+**This repository contains 5 different trading strategies that ALL FAILED. This is not because of bugs or poor implementation. This is because retail algorithmic trading is fundamentally nonviable in 2024. Read this README before wasting your time.**
 
-_An institutional-quality quantitative trading system that systematically exploits funding rate arbitrage opportunities_
+## Executive Summary
 
-[Features](#-key-features) • [Strategy](#-the-strategy) • [Architecture](#-system-architecture) • [Installation](#-installation) • [Usage](#-usage-guide) • [Research](#-research-framework)
+Over 6 months, I built and tested 5 different algorithmic trading strategies with professional-grade backtesting, risk management, and execution systems. Every single strategy failed to produce meaningful returns after accounting for real-world costs.
 
-</div>
+**Final Verdict: The edge required for profitable algorithmic trading no longer exists at retail scale.**
 
----
+## The Journey: 5 Strategies, 5 Failures
 
-## 📋 Table of Contents
+### 1. Momentum/Mean Reversion Strategy (RSI + SMA)
 
-- [Overview](#-overview)
-- [Core Philosophy](#-core-philosophy)
-- [The Strategy](#-the-strategy)
-- [Key Features](#-key-features)
-- [System Architecture](#-system-architecture)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Installation](#-installation)
-- [Configuration](#-configuration)
-- [Usage Guide](#-usage-guide)
-- [Research Framework](#-research-framework)
-- [Contributing](#-contributing)
+**The Theory:** Buy oversold, sell overbought, follow the trend
+**Implementation:**
 
----
+- RSI < 30 = Buy, RSI > 70 = Sell
+- 50/200 SMA crossovers for trend confirmation
+- Tested on 4 years of BTC/ETH data
 
-## 🎯 Overview
+**Results:**
 
-**Project Chimera** is a sophisticated, fully autonomous trading bot designed to systematically exploit funding rate arbitrage opportunities in the cryptocurrency markets. This project has evolved from a simple hobby bot into a production-grade, institutional-quality quantitative trading system, built with a **"safety-first"** and **data-driven philosophy**.
+- Annual Return: 0.75%
+- Sharpe Ratio: 0.12
+- Max Drawdown: 43%
 
-> 💡 **Key Insight**: The system is architected to be a long-term, self-sufficient trading business, starting with a small capital base (€100) and intelligently scaling its operations as it grows.
+**Why It Failed:**
 
----
+- By the time RSI shows oversold, institutional algos have already bought
+- Moving averages lag by design - you're always late
+- Transaction costs (0.1% per trade) destroyed thin margins
+- What worked in 2017 is arbitraged away by 2024
 
-## 🧠 Core Philosophy
+### 2. Statistical Arbitrage / Pairs Trading (ETH/BTC)
 
-<div align="center">
+**The Theory:** Trade the spread when historically correlated pairs diverge
+**Implementation:**
 
-### _"Don't predict the market. Exploit its inefficiencies."_
+- Cointegration testing (Johansen test)
+- Z-score entry/exit signals
+- Beta-hedged position sizing
 
-</div>
+**Results:**
 
-Guided by the principles of professional quantitative finance, this bot does not attempt to predict market direction. Instead, it exploits a structural market inefficiency known as **Funding Rate Arbitrage**.
+- Annual Return: 5.66%
+- Sharpe Ratio: 0.89
+- Total Trades: 25 in 4 years
+- Max Drawdown: 4.20%
 
----
+**Why It Failed:**
 
-## 🎯 The Strategy
+- Crypto pairs are cointegrated only ~20% of the time
+- When they diverge, it's usually for fundamental reasons (not mean reversion)
+- Capital efficiency terrible - money tied up waiting for rare signals
+- 6 trades per year = not statistically significant
 
-### "The Sniper" - Delta-Neutral Arbitrage
+### 3. Funding Rate Arbitrage
 
-Our core strategy is a **delta-neutral**, "long spot, short perpetuals" arbitrage system designed to be a patient "sniper," waiting for periods of extreme and stable positive funding rates.
+**The Theory:** Collect funding payments being delta-neutral (spot vs perpetual)
+**Implementation:**
 
-<table>
-<tr>
-<td width="50%">
+- Enter when funding APR > 15-24%
+- Exit when funding APR < 4%
+- Delta neutral through spot/perp positions
 
-#### 📊 The Edge
+**Results (Optimistic Backtest):**
 
-During bullish periods, perpetual futures often trade at a premium to spot price. Longs pay shorts a "funding rate" every 8 hours - we capture this as near risk-free profit.
+- Annual Return: ~20%
+- Sharpe Ratio: 4-5
+- Trades: 3-6 per year
 
-</td>
-<td width="50%">
+**Results (Reality with Correct Implementation):**
 
-#### 🎯 Regime Filter
+- Annual Return: 4-6%
+- Sharpe Ratio: 0.58-0.84
+- Trades: 3-5 per year
 
-Only enters trades when both current APR and rolling average APR exceed optimized thresholds (e.g., >12%), ensuring stable, high-conviction regimes.
+**Why It Failed:**
 
-</td>
-</tr>
-<tr>
-<td width="50%">
+- Extreme funding rates (>15% APR) happen 3-5 times per year
+- Institutional traders with better execution capture these instantly
+- When accounting for execution slippage, profits evaporate
+- Capital sits idle 95% of the time
 
-#### ⏳ Patience
+### 4. Simple Trend Following
 
-Designed to be in cash most of the time, preserving capital until high-probability opportunities arise. Executes a small number of highly profitable trades per year.
+**The Theory:** Price above 200 SMA + RSI not overbought = Buy
+**Implementation:**
 
-</td>
-<td width="50%">
+- Entry: Price > 200 SMA, RSI < 65-75
+- Exit: Stop loss 7%, Take profit 25%
+- Position sizing: 25-33% of capital
 
-#### 🌐 Diversification
+**Results:**
 
-Trades a portfolio of assets (BTC, ETH, SOL, DOGE), each with unique optimized parameters to increase trade frequency and smooth returns.
+- Annual Return: 5.57-7.60%
+- Sharpe Ratio: 0.82
+- Win Rate: 60%
+- Trades: 2-3 per year
 
-</td>
-</tr>
-</table>
+**Why It Failed:**
 
----
+- 2-3 trades per year = lottery tickets, not a strategy
+- 7.6% annual returns don't justify the complexity and risk
+- Better returns available in index funds with zero effort
 
-## ✨ Key Features
+### 5. Multi-Timeframe Trend Following (The "Nuclear Option")
 
-<div align="center">
+**The Theory:** Combine daily, 4H, and 1H signals for more opportunities
+**Implementation:**
 
-| Feature                               | Description                                                          |
-| ------------------------------------- | -------------------------------------------------------------------- |
-| **🪙 Multi-Asset Portfolio**          | Trades a basket of pre-optimized assets with unique parameters       |
-| **📈 Progressive Capital Management** | Intelligently scales strategy, unlocking new assets as account grows |
-| **🛡️ Production-Hardened Engine**     | Professional-grade safety features for 24/7 reliability              |
-| **💾 State Recovery**                 | Survives crashes/restarts without losing position tracking           |
-| **🔐 Data Integrity**                 | Validates exchange time and market data integrity                    |
-| **📱 Real-Time Monitoring**           | Comprehensive alerts via Telegram bot integration                    |
-| **🔧 Modular Architecture**           | Clean separation of concerns for maintainability                     |
-| **🔬 Research Framework**             | Powerful backtester and parameter optimizer included                 |
+- Hierarchical signal resolution
+- Timeframe-specific parameters
+- Complex position management
 
-</div>
+**Results:**
 
----
+- Annual Return: 3.6%
+- Sharpe Ratio: 0.09
+- Win Rate: 28%
+- Max Drawdown: 28.79%
+- Total Trades: 600+
 
-## 🏗️ System Architecture
+**Why It Failed:**
 
-The bot follows a **"Brain, Muscles, Hands"** analogy with modular components:
+- Increased complexity led to more whipsaws
+- Transaction costs multiplied with trade frequency
+- Lower timeframes = more noise, less signal
+- 28% win rate = donation system
 
-```mermaid
-graph TB
-    A[Data Feed] -->|Market Data| B[Strategy Brain]
-    B -->|Signals| C[Position Sizer]
-    C -->|Orders| D[Execution Engine]
-    D -->|Trades| E[Risk Manager]
-    E -->|Monitoring| F[Notifier]
-    F -->|Alerts| G[Operator]
+## The Brutal Truth About Markets in 2024
 
-    H[State Manager] -.->|Persistence| D
-    I[Ledger] -.->|Logging| D
+### Who's Actually Making Money in Algo Trading:
+
+**Institutional Players:**
+
+- **Citadel/Jump Trading:** Nanosecond execution, unlimited capital, see order flow
+- **Market Makers:** Paid by exchanges to provide liquidity, guaranteed profit
+- **MEV Bots:** Frontrunning transactions on blockchain, requires $1M+ setup
+
+**What They Have That You Don't:**
+
+- Colocated servers (microsecond latency vs your 100ms)
+- Direct exchange connections and special API rates
+- Teams of PhDs in mathematics and physics
+- Access to order flow information
+- Capital to survive 50% drawdowns
+
+### The Efficient Market Reality
+
+Every obvious pattern you can find in TradingView has been arbitraged away:
+
+- Moving average crosses? Priced in milliseconds before you see them
+- Support/resistance? Algorithms drawing 1000 different lines
+- RSI oversold? Institutions bought 5 minutes ago
+- Chart patterns? Pattern recognition algos found it first
+
+## Why This Project Has No Future
+
+### The Math Doesn't Work
+
+```python
+# Retail Reality
+trades_per_year = 50
+win_rate = 0.45  # You lose more than you win
+average_win = 0.02  # 2%
+average_loss = 0.015  # 1.5%
+transaction_cost = 0.002  # 0.2% round trip
+
+gross_return = (trades_per_year * win_rate * average_win) -
+               (trades_per_year * (1-win_rate) * average_loss)
+# = 0.6375 (6.375% gross)
+
+net_return = gross_return - (trades_per_year * transaction_cost)
+# = -0.3625 (-36.25% net)
+
+# You're guaranteed to lose money
 ```
-
-### Component Breakdown
-
-| Component                 | File                             | Responsibility                                      |
-| ------------------------- | -------------------------------- | --------------------------------------------------- |
-| **🧠 The Brain**          | `strategy.py`                    | Holds optimized parameters, scans for opportunities |
-| **💪 The Muscles**        | `position_sizer.py`              | Calculates precise, safely-sized trade orders       |
-| **🤲 The Hands**          | `execution.py`                   | State machine managing entire trade lifecycle       |
-| **👁️ The Senses**         | `data_feed.py`                   | Resilient exchange connection with time sync        |
-| **🛡️ The Safety Net**     | `risk_manager.py`                | Monitors drawdowns, maintenance, memory usage       |
-| **📡 The Nervous System** | `notifier.py`                    | Real-time alerts for critical actions               |
-| **🧬 The Memory**         | `state_manager.py` & `ledger.py` | Position persistence and trade recording            |
-
----
-
-## 🛠️ Tech Stack
-
-<div align="center">
-
-|                                                     Technology                                                      |       Role        | Why We Chose It                                   |
-| :-----------------------------------------------------------------------------------------------------------------: | :---------------: | :------------------------------------------------ |
-|      ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)      |   Core Language   | Universal standard for quant research and trading |
-|                 ![CCXT](https://img.shields.io/badge/CCXT-Exchange%20API-00D4AA?style=flat-square)                  |   Exchange API    | Premier unified API for crypto exchanges          |
-| ![Pandas](https://img.shields.io/badge/Pandas-Data%20Analysis-150458?style=flat-square&logo=pandas&logoColor=white) | Data Manipulation | Ultimate tool for time-series analysis            |
-|      ![DotEnv](https://img.shields.io/badge/.env-Config-ECD53F?style=flat-square&logo=dotenv&logoColor=black)       |   Configuration   | Professional standard for managing secrets        |
-|                 ![PSUtil](https://img.shields.io/badge/PSUtil-Monitoring-4B8BBE?style=flat-square)                  | System Monitoring | Cross-platform process monitoring                 |
-|                  ![Requests](https://img.shields.io/badge/Requests-HTTP-3776AB?style=flat-square)                   |   HTTP Requests   | Robust library for API calls                      |
-
-</div>
-
----
-
-## 📁 Project Structure
-
-```
-crypto-trading-bot/
-│
-├── 📄 .env                     # API keys and secrets (local only)
-├── 📋 requirements.txt         # Project dependencies
-├── 📖 README.md               # This file
-│
-├── 📊 data/                   # Raw data and trade logs
-│   └── paper_trade_log.csv
-│
-├── 📝 logs/                   # Daily application log files
-│
-├── 🔬 research_results/       # Curated outputs from research phase
-│
-└── 💻 src/                    # Main source code package
-    ├── __init__.py
-    │
-    ├── 🚀 live_trader.py      # <<<< MAIN APPLICATION ENTRY POINT
-    │
-    ├── 🧠 strategy.py         # The "Brain"
-    ├── 💪 position_sizer.py   # The "Muscles"
-    ├── 🤲 execution.py        # The "Hands"
-    ├── 🛡️ risk_manager.py     # The "Safety Net"
-    ├── 👁️ data_feed.py        # The "Senses"
-    ├── 📒 ledger.py          # Paper Trading Memory
-    ├── 📥 collect_data.py    # Data downloading utility
-    │
-    ├── 🤖 bot/               # Sub-package for utilities
-    │   ├── __init__.py
-    │   ├── 📡 notifier.py
-    │   ├── 📝 logger.py
-    │   └── 💾 state_manager.py
-    │
-    └── 🔬 research/          # Research toolkit
-        ├── __init__.py
-        ├── 🔍 funding_rate_scanner.py
-        ├── ⚙️ optimizer.py
-        └── 📈 funding_arb_backtester.py
-```
-
----
-
-## 🚀 Installation
-
-### Prerequisites
-
-- Python 3.10 or higher
-- Git
-- Binance Testnet account
-- Telegram Bot (for notifications)
-
-### Step-by-Step Setup
-
-<details>
-<summary><b>1️⃣ Clone the Repository</b></summary>
-
-```bash
-git clone <repository_url>
-cd crypto-trading-bot
-```
-
-</details>
-
-<details>
-<summary><b>2️⃣ Create Virtual Environment</b></summary>
-
-```bash
-python -m venv venv
-```
-
-</details>
-
-<details>
-<summary><b>3️⃣ Activate Environment</b></summary>
-
-**Windows:**
-
-```powershell
-.\venv\Scripts\Activate.ps1
-```
-
-**macOS/Linux:**
-
-```bash
-source venv/bin/activate
-```
-
-</details>
-
-<details>
-<summary><b>4️⃣ Install Dependencies</b></summary>
-
-```bash
-pip install -r requirements.txt
-```
-
-</details>
-
----
-
-## ⚙️ Configuration
-
-### Environment Setup
-
-1. **Create Configuration File**
-
-   ```bash
-   cp .env.example .env
-   ```
-
-2. **Configure API Credentials**
-
-   <details>
-   <summary><b>🔐 Binance Testnet Setup</b></summary>
-
-   - Visit [Binance Testnet](https://testnet.binance.vision/)
-   - Log in with GitHub
-   - Generate API key and secret
-   - ⚠️ **CRITICAL**: Use ONLY testnet keys, never real Binance keys!
-   </details>
-
-   <details>
-   <summary><b>📱 Telegram Bot Setup</b></summary>
-
-   - Message [@BotFather](https://t.me/BotFather) on Telegram
-   - Create new bot and copy token
-   - Get your chat ID from [@userinfobot](https://t.me/userinfobot)
-   </details>
-
-3. **Edit `.env` File**
-
-   ```ini
-   # --- BINANCE TESTNET ---
-   BINANCE_TESTNET_API_KEY="<YOUR_TESTNET_API_KEY>"
-   BINANCE_TESTNET_API_SECRET="<YOUR_TESTNET_SECRET_KEY>"
-
-   # --- TELEGRAM ---
-   TELEGRAM_TOKEN="<YOUR_BOT_TOKEN>"
-   TELEGRAM_CHAT_ID="<YOUR_PERSONAL_CHAT_ID>"
-   ```
-
----
-
-## 📚 Usage Guide
-
-> 💡 **Note**: All commands should be run from the root directory with virtual environment activated.
-
-### 1️⃣ Data Collection
-
-<table>
-<tr>
-<td>
-
-**Download OHLCV Price Data**
-
-```bash
-python -m src.collect_data ohlcv ETH/USDT
-```
-
-</td>
-<td>
-
-**Download Funding Rates**
-
-```bash
-python -m src.collect_data funding ETH/USDT
-```
-
-</td>
-</tr>
-</table>
-
-### 2️⃣ Research & Optimization
-
-<table>
-<tr>
-<td>
-
-**Scan Live Funding Rates**
-
-```bash
-python -m src.research.funding_rate_scanner
-```
-
-</td>
-<td>
-
-**Optimize Parameters**
-
-```bash
-# Edit SYMBOL_TO_OPTIMIZE in optimizer.py first
-python -m src.research.optimizer
-```
-
-</td>
-</tr>
-</table>
-
-### 3️⃣ Live Paper Trading
-
-**Start the Bot** 🚀
-
-```bash
-python -m src.live_trader
-```
-
-The bot will:
-
-- ✅ Initialize all components
-- 📱 Send Telegram confirmation
-- 🔄 Begin 24/7 operation loop
-- 📝 Log to console and daily files
-- 💾 Save trades to `data/paper_trade_log.csv`
-
----
-
-## 🔬 Research Framework
-
-The research package includes powerful tools for strategy development:
-
-| Tool           | Purpose                                | Usage                                  |
-| -------------- | -------------------------------------- | -------------------------------------- |
-| **Scanner**    | Find current arbitrage opportunities   | Real-time market scanning              |
-| **Optimizer**  | Discover optimal parameters            | Grid search with walk-forward analysis |
-| **Backtester** | Validate strategies on historical data | Full transaction cost modeling         |
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
----
-
-<div align="center">
-
-### 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-**Built with ❤️ by quantitative traders, for quantitative traders**
-
-_Remember: Past performance does not guarantee future results. Trade responsibly._
-
-</div>

@@ -34,7 +34,7 @@ Over 2 months, I built and tested 5 different algorithmic trading strategies wit
 - By the time RSI shows oversold, institutional algos have already bought
 - Moving averages lag by design - you're always late
 - Transaction costs (0.1% per trade) destroyed thin margins
-- What worked in 2017 is arbitraged away by 2024
+- What worked in 2017 is arbitraged away by 2025
 
 ### 2. Statistical Arbitrage / Pairs Trading (ETH/BTC)
 
@@ -242,7 +242,7 @@ The edge doesn't exist anymore. It's been arbitraged away by institutions with b
 Do yourself a favor: Delete this repo, buy some Bitcoin, and build something people actually want.
 
 Repository Status: ☠️ DECEASED
-Time of Death: 2024
+Time of Death: 2025
 Cause: Reality
 Next Steps: Build something useful
 

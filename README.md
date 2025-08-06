@@ -4,7 +4,7 @@
 
 ## ⚠️ WARNING TO FUTURE DEVELOPERS
 
-This repository contains **5 different trading strategies that ALL FAILED**. This is not because of bugs or poor implementation. This is because **retail algorithmic trading is fundamentally nonviable in 2024**. Read this README before wasting your time.
+This repository contains **5 different trading strategies that ALL FAILED**. This is not because of bugs or poor implementation. This is because **retail algorithmic trading is fundamentally nonviable in 2025**. Read this README before wasting your time.
 
 ---
 

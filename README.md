@@ -1,6 +1,6 @@
 # Project Chimera: A Post-Mortem on Retail Algorithmic Trading
 
-### Or: How I Spent 300 Hours Learning That Retail Trading Is Dead
+### Or: How I Spent 100 Hours Learning That Retail Trading Is Dead
 
 ## ⚠️ WARNING TO FUTURE DEVELOPERS
 
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Over 6 months, I built and tested 5 different algorithmic trading strategies with professional-grade backtesting, risk management, and execution systems. Every single strategy failed to produce meaningful returns after accounting for real-world costs.
+Over 2 months, I built and tested 5 different algorithmic trading strategies with professional-grade backtesting, risk management, and execution systems. Every single strategy failed to produce meaningful returns after accounting for real-world costs.
 
 **Final Verdict: The edge required for profitable algorithmic trading no longer exists at retail scale.**
 
@@ -133,7 +133,7 @@ Over 6 months, I built and tested 5 different algorithmic trading strategies wit
 - Lower timeframes = more noise, less signal
 - 28% win rate = donation system
 
-## The Brutal Truth About Markets in 2024
+## The Brutal Truth About Markets in 2025
 
 ### Who's Actually Making Money in Algo Trading:
 

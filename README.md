@@ -289,7 +289,14 @@ The edge doesn't exist anymore. It's been arbitraged away by institutions with b
 
 Do yourself a favor: Delete this repo, buy some Bitcoin, and build something people actually want.
 
+<<<<<<< HEAD
 ### Repository Status: ☠️ DECEASED
+=======
+Repository Status: ☠️ DECEASED
+Time of Death: 2025
+Cause: Reality
+Next Steps: Build something useful
+>>>>>>> d9f334f495f852f5a07f261100517492e064aab3
 
 - **Time of Death:** 2025
 - **Cause:** Reality

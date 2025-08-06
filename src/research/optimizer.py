@@ -1,24 +1,15 @@
-# src/research/optimizer.py (Mentor-Directed Aggressive Version)
-
 import pandas as pd
 import itertools
 from tqdm import tqdm
 import os
 import sys
 
-# The '..' moves up from the 'research' directory to the 'src' package level,
-# then finds the backtester module, which you moved there.
 from ..funding_arb_backtester import run_funding_arb_backtest
 
-# --- Configuration ---
-# Let's start with DOGE as it had the highest activity in the last test.
 SYMBOL_TO_OPTIMIZE = "DOGE/USDT"
 START_YEAR = 2022
 RESULTS_FILE = f"research_results/optimizer_report_AGGRESSIVE_{SYMBOL_TO_OPTIMIZE.replace('/', '_')}.csv"
 
-# --- MENTOR'S NEW AGGRESSIVE PARAMETER RANGES ---
-# The goal is to increase trade frequency and target higher annual returns (15%+)
-# and a Sharpe Ratio > 1.2, even if it means accepting a higher drawdown.
 ENTRY_THRESHOLDS = [6, 8, 10, 12]
 EXIT_THRESHOLDS = [2, 3, 4]
 REGIME_FILTER_PERIODS = [1, 2, 3]  # Faster reaction times as per mentor advice.
@@ -68,7 +59,6 @@ def run_optimizer():
             print(f"Skipping a run due to error: {result['error']}")
             continue
 
-        # Add the parameters to the results dictionary for reporting
         result["Entry APR"] = entry_apr
         result["Exit APR"] = exit_apr
         result["Filter Periods"] = filter_periods
@@ -104,7 +94,6 @@ def run_optimizer():
     ]
     results_df_sorted = results_df_sorted[report_columns]
 
-    # Create the research_results directory if it doesn't exist in the project root
     if not os.path.exists("research_results"):
         os.makedirs("research_results")
 

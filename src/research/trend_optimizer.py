@@ -1,5 +1,3 @@
-# src/research/trend_optimizer.py (Version 2.0 - Dynamic Engine)
-
 import pandas as pd
 import itertools
 from tqdm import tqdm
@@ -9,13 +7,11 @@ import sys
 # Correctly import the backtester from its location
 from .trend_backtester import TrendBacktester
 
-# --- MENTOR'S PRESCRIBED PARAMETER GRID ---
-# We add the new 'entry_setup' to test all three strategies.
 PARAMETER_GRID = {
     "entry_setup": ["A", "B", "C"],  # The three different strategies to test
     "sma_period": [200],
     "rsi_period": [14],
-    "rsi_entry_max": [65, 70, 75],  # Only used by Setup A
+    "rsi_entry_max": [65, 70, 75],
     "stop_loss_pct": [3, 5, 7],
     "take_profit_pct": [10, 15, 20, 25],
     "position_size_pct": [25, 33],

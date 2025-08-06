@@ -1,7 +1,5 @@
-# src/execution.py (Version 1.0)
-
 import time
-import uuid  # To generate unique order IDs for tracking
+import uuid
 
 
 class ExecutionHandler:
@@ -71,14 +69,10 @@ class ExecutionHandler:
             print(f"   - SUCCESS: Spot order placed. Order ID: {spot_order_id}")
         except Exception as e:
             print(f"   - FAILED to place spot order: {e}")
-            # --- CRITICAL: Handle the failed leg ---
-            # This is where the "panic_close_perp" logic would go.
-            # For V1.0, we will just log the critical error.
             print("\n   >>> CRITICAL ERROR: PERP LEG FILLED, SPOT LEG FAILED. MANUAL INTERVENTION REQUIRED! <<<")
             self.state = "EMERGENCY_CLOSING"
             return False
 
-        # --- Final Step: Success ---
         self.state = "IN_POSITION"
         self.current_position = sized_order
         print(f"--- Trade Entry SUCCESSFUL. State is now {self.state}. Position: {self.current_position} ---")

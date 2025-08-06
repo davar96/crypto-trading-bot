@@ -1,12 +1,9 @@
-# src/data_feed.py (Version 1.3 - With Time Synchronization)
-
 import time
 import ccxt
 from dotenv import load_dotenv
 import os
 import sys
 
-# Use the absolute path from the project root
 from src.bot.notifier import Notifier
 
 
@@ -33,9 +30,6 @@ class DataFeedManager:
 
         # --- NEW: Perform time sync on every connection attempt ---
         if not self.verify_time_sync():
-            # If the time drift is too large, it's a critical error.
-            # We will handle the failure within the verify_time_sync method.
-            # For now, we prevent connection if sync fails.
             print("Connection aborted due to time sync failure.")
             return False
 

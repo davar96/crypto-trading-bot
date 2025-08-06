@@ -1,9 +1,7 @@
-# src/bot/state_manager.py (Version 2.0 - With Capital Persistence)
-
 import json
 import os
 from datetime import datetime
-from src.bot.logger import logger  # Use our singleton logger
+from src.bot.logger import logger
 
 
 class StateManager:
@@ -16,8 +14,6 @@ class StateManager:
         self.position_state_file = position_state_file
         self.capital_file = capital_file  # <-- NEW
         logger.info("State Manager initialized.")
-
-    # --- Position State Methods (for in-flight trades) ---
 
     def save_position_state(self, open_position):
         """Saves the details of an open position to the state file."""
@@ -56,8 +52,6 @@ class StateManager:
                 return False
         return True
 
-    # --- NEW: Capital State Methods (for long-term memory) ---
-
     def save_capital(self, current_capital):
         """Saves the current capital to the capital file."""
         try:
@@ -84,9 +78,7 @@ class StateManager:
                     return capital
             except Exception as e:
                 logger.error(f"STATE ERROR: Failed to load capital file. Reason: {e}")
-                # Fallback to starting capital if file is corrupted
                 return starting_capital
 
-        # If file doesn't exist, this is the first run.
         logger.info("STATE: No capital file found. Using starting capital.")
         return starting_capital

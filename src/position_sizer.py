@@ -1,11 +1,8 @@
-# src/position_sizer.py (Version 1.1 - Passes initial_apr)
-
 import ccxt
 from dotenv import load_dotenv
 import os
 import sys
 
-# Add the parent directory to the path to allow importing the Strategy module for testing
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from src.strategy import FundingArbStrategy
 
@@ -74,7 +71,6 @@ def select_and_size_position(signals, current_capital_usd, exchange):
         "notional_value_usd": notional_trade_value,
         "asset_quantity": asset_quantity,
         "asset_price": asset_price,
-        # --- MODIFIED: Added initial_apr for PnL calculation in live_trader ---
         "initial_apr": best_signal["current_apr"],
     }
 

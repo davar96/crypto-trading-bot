@@ -125,9 +125,6 @@ class TrendBacktester:
         return all([price_above_vwap, volume_spike])
 
     def run_backtest(self, show_plot=True):
-        # (The core run_backtest, _get_execution_price, _calculate_stats, etc. methods
-        # remain IDENTICAL to Version 1.5, as they correctly handle the trading logic.
-        # We are only changing the *signal generation* part.)
         self._calculate_indicators()
         if self.data.empty:
             return {"error": "No data available for backtest."}
@@ -171,10 +168,6 @@ class TrendBacktester:
             self.equity_curve.append({"timestamp": i, "equity": self.equity})
 
         return self._calculate_stats(show_plot=show_plot)
-
-    # All helper methods like _get_execution_price, _save_trade_log, _sanity_check_results, etc.
-    # are assumed to be here, identical to Version 1.5
-    # For brevity, only showing the parts that changed. The full code would include them.
 
     def _get_execution_price(self, ideal_price, side, atr_pct):
         if side == "buy":
@@ -253,12 +246,11 @@ if __name__ == "__main__":
         print("ERROR: Please download BTC/USDT 1-day OHLCV data starting from 2018.")
         sys.exit()
 
-    # --- Test ONE of the new setups to ensure it works ---
     test_params = {
-        "entry_setup": "B",  # Test the "Pullback to 50d" strategy
+        "entry_setup": "B",
         "sma_period": 200,
         "rsi_period": 14,
-        "rsi_entry_max": 75,  # Still needed for filters
+        "rsi_entry_max": 75,
         "stop_loss_pct": 5,
         "take_profit_pct": 15,
         "position_size_pct": 25,

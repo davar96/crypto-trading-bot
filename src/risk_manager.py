@@ -1,4 +1,4 @@
-import psutil  # <-- NEW IMPORT
+import psutil
 import os
 from src.bot.notifier import Notifier
 from src.bot.logger import logger
@@ -64,7 +64,6 @@ class RiskManager:
             return True  # Fail safe, allow operation but log the error
         return True
 
-    # --- NEW METHOD ---
     def check_memory_usage(self):
         """
         Checks the bot's current memory usage against a threshold.
@@ -79,7 +78,6 @@ class RiskManager:
             )
             logger.warning(warning_message)
             self.notifier.send_message(warning_message)
-            # This is a warning, not a shutdown trigger, but could be made one.
 
         return True
 

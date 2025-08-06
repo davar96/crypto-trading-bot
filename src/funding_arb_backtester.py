@@ -1,12 +1,9 @@
-# src/funding_arb_backtester.py (Version 2.8 - With Kill Switch)
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 import sys
 
-# The '.' tells Python to look for strategy.py inside the same package (src).
 from .strategy import FundingArbStrategy
 
 
@@ -91,7 +88,6 @@ def run_funding_arb_backtest(
                 in_position = False
                 current_trade = {}
 
-            # --- NEW: MENTOR'S KILL SWITCH ---
             # Exit Condition 2: Funding rate turned negative (Risk Management Exit)
             elif row["fundingRate"] < 0:
                 costs = current_trade["notional_value"] * (ROUND_TRIP_FEES + ROUND_TRIP_SLIPPAGE)
@@ -156,10 +152,8 @@ if __name__ == "__main__":
 
     warnings.filterwarnings("ignore", category=FutureWarning)
 
-    # --- Updated main block to test the new Kill Switch logic ---
     print("--- Running a single test case with the new Kill Switch backtester ---")
 
-    # Use one of the aggressive parameter sets the optimizer will test
     test_params = {"DOGE/USDT": {"entry_apr": 8, "exit_apr": 3, "filter_periods": 2}}
 
     results = run_funding_arb_backtest(

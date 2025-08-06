@@ -1,5 +1,3 @@
-# src/live_trader.py (Version 3.6 - Corrected PnL Logic)
-
 import ccxt
 import time
 from dotenv import load_dotenv
@@ -22,7 +20,7 @@ LOOP_INTERVAL_SECONDS = 60
 STARTING_CAPITAL_USD = 100.0
 ROUND_TRIP_FEES = 0.001 * 4
 ROUND_TRIP_SLIPPAGE = 0.0005 * 2
-FUNDING_PERIOD_HOURS = 8  # Binance standard is 8 hours
+FUNDING_PERIOD_HOURS = 8
 
 
 def create_exchange(use_testnet=True):
@@ -63,7 +61,7 @@ def main():
     last_heartbeat_time = time.time()
     last_periodic_check = time.time()
 
-    # --- STATE RECOVERY LOGIC (Unchanged) ---
+    # --- STATE RECOVERY LOGIC  ---
     recovered_state = state_manager.load_position_state()
     if recovered_state:
         logger.info("!!! RECOVERED POSITION STATE DETECTED !!!")
@@ -129,17 +127,10 @@ def main():
                         ledger.log_trade("ENTER", open_position, current_capital)
                         state_manager.save_position_state(open_position)
             else:
-                # =================================================================
-                # --- BUG FIX: REMOVED INCORRECT PNL ACCRUAL ---
-                # The previous logic incorrectly added funding PnL on every loop.
-                # The correct approach is to do nothing here and calculate all PnL ONCE at exit.
                 logger.info(f"Managing open position for {open_position['symbol']}. Monitoring for exit signal...")
                 # =================================================================
 
                 if strategy.check_exit_signal(open_position):
-                    # =================================================================
-                    # --- BUG FIX: REBUILT PNL CALCULATION AT EXIT ---
-
                     # 1. Get accurate entry and exit details
                     entry_time = datetime.datetime.fromisoformat(open_position["entry_time"])
                     exit_time = datetime.datetime.now()
@@ -153,8 +144,7 @@ def main():
                     num_funding_events = holding_duration.total_seconds() // (FUNDING_PERIOD_HOURS * 3600)
 
                     # 3. Estimate total GROSS funding PnL
-                    # We use the initial APR as a conservative estimate for the average rate paid.
-                    initial_apr = open_position.get("initial_apr", 0.0)  # From position_sizer.py
+                    initial_apr = open_position.get("initial_apr", 0.0)
                     apr_per_period = (initial_apr / 100) / (365 * (24 / FUNDING_PERIOD_HOURS))
                     gross_funding_pnl = notional_value * apr_per_period * num_funding_events
 

@@ -1,11 +1,8 @@
-# src/research/funding_rate_scanner.py
-
 import ccxt
 import pandas as pd
 
 # --- Configuration ---
 # The base assets we want to scan for funding rate opportunities.
-# (e.g., 'BTC' will scan the 'BTC/USDT:USDT' perpetual contract)
 SYMBOL_UNIVERSE = [
     "BTC",
     "ETH",

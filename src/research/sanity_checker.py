@@ -1,5 +1,3 @@
-# src/research/sanity_checker.py (Version 2.0 - Multi-Scenario Analysis)
-
 import pandas as pd
 import os
 
@@ -67,19 +65,14 @@ def run_sanity_check(symbol, year, basis_threshold_bps=50):
 
 
 if __name__ == "__main__":
-    # Ensure all required data files for BTC and DOGE since 2022 are present first!
     print("===== Starting Market-Wide Reconnaissance =====")
 
-    # Scenario 1: The original test. Confirms our baseline.
     run_sanity_check(symbol="BTC/USDT", year=2023, basis_threshold_bps=50)
 
-    # Scenario 2: The "Bear Market" check. Was 2023 an anomaly for BTC?
     run_sanity_check(symbol="BTC/USDT", year=2022, basis_threshold_bps=50)
 
-    # Scenario 3: The "Asset Personality" check. Does a less efficient asset show opportunity?
     run_sanity_check(symbol="DOGE/USDT", year=2023, basis_threshold_bps=50)
 
-    # Scenario 4: The "Lowered Bar" check. Is the 50bps threshold too high for BTC?
     run_sanity_check(symbol="BTC/USDT", year=2023, basis_threshold_bps=20)
 
     print("\n===== Reconnaissance Complete =====")

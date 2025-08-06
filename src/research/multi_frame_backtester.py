@@ -1,5 +1,3 @@
-# src/research/multi_frame_backtester.py (Version 1.2 - Corrected Data Alignment)
-
 import pandas as pd
 import numpy as np
 import random
@@ -80,17 +78,12 @@ class MultiFrameBacktester:
 
     def _align_data(self):
         print("--- Aligning Multi-Timeframe Data ---")
-        # --- BUG FIX: A more robust alignment method ---
-        # First, calculate indicators on each separate dataframe
         for tf, config in TIMEFRAME_CONFIG.items():
             self._calculate_indicators(self.data[tf], config)
 
-        # Then, use the 1h data as the primary loop driver
         aligned_df = self.data["1h"].copy()
 
-        # Merge higher timeframes, adding suffixes to their columns
         for tf in ["4h", "1d"]:
-            # Rename columns BEFORE the merge
             tf_data_renamed = self.data[tf].rename(columns=lambda c: f"{c}_{tf}")
             aligned_df = pd.merge_asof(
                 aligned_df, tf_data_renamed, left_index=True, right_index=True, direction="backward"
@@ -99,10 +92,9 @@ class MultiFrameBacktester:
         aligned_df.dropna(inplace=True)
         print("Data alignment complete.")
         return aligned_df
-        # --- END BUG FIX ---
 
     def _calculate_indicators(self, df, config):
-        # This function no longer needs the 'tf' parameter as it operates on one df at a time
+
         df[f'sma_{config["sma_period"]}'] = df["close"].rolling(window=config["sma_period"]).mean()
         delta = df["close"].diff()
         gain = delta.where(delta > 0, 0).rolling(window=config["rsi_period"]).mean()
@@ -120,7 +112,6 @@ class MultiFrameBacktester:
         df["candle_extended"] = (df["close"] - df["open"]) / df["open"] > 0.05
         df["volatility_high"] = (df["atr_14"] / df["close"]) > 0.03
         df["is_fomc"] = df.index.strftime("%Y-%m-%d").isin(self.FOMC_DATES)
-        # Note: We dropna() in the alignment step, not here.
 
     def _check_signal(self, row, tf, config):
         suffix = f"_{tf}" if tf != "1h" else ""
@@ -145,8 +136,6 @@ class MultiFrameBacktester:
                 return "BUY"
         return None
 
-    # ... (The rest of the file remains identical to the last version)
-    # The run_backtest, _resolve_signals, _get_execution_price, _calculate_stats, and _plot_results methods are unchanged.
     def _resolve_signals(self, signals):
         if signals.get("1d") == "SELL":
             return []

@@ -1,5 +1,3 @@
-# src/strategy.py (Version 1.2 - With Signal Validation)
-
 import ccxt
 import pandas as pd
 from dotenv import load_dotenv
@@ -23,25 +21,20 @@ class FundingArbStrategy:
             1000: ["DOGE/USDT", "SOL/USDT", "ETH/USDT", "BTC/USDT"],
         }
 
-    # --- NEW VALIDATION METHOD ---
     def validate_signal(self, symbol, latest_data):
         """
         Performs sanity checks on the data before confirming a signal.
         Returns True if the signal is valid, False otherwise.
         """
         try:
-            # Check 1: Data Freshness (using the timestamp from the funding rate data)
             data_timestamp_ms = latest_data["timestamp"]
             current_timestamp_ms = int(time.time() * 1000)
             time_diff_seconds = (current_timestamp_ms - data_timestamp_ms) / 1000
 
-            # Funding data is typically 8 hours old. We'll allow up to 9 hours to be safe.
             if time_diff_seconds > 9 * 3600:
                 print(f"  - VALIDATION FAILED for {symbol}: Data is stale ({time_diff_seconds / 3600:.2f} hours old).")
                 return False
 
-            # Check 2: Reasonable Funding Rate (APR between 5% and 1500%)
-            # We use a slightly lower bound to ensure the signal is strong enough.
             current_apr = latest_data["apr"]
             if not (5.0 < current_apr < 1500.0):
                 print(
@@ -49,10 +42,7 @@ class FundingArbStrategy:
                 )
                 return False
 
-            # Check 3: Basis Spread (placeholder for now, as it requires more API calls)
-            # This is a good place to add the check in a future version.
-
-            return True  # All checks passed
+            return True
         except Exception as e:
             print(f"  - VALIDATION ERROR for {symbol}: {e}")
             return False
@@ -90,7 +80,6 @@ class FundingArbStrategy:
                     f"  - {symbol}: Current APR={latest_data['apr']:.2f}%, Avg APR={latest_data['rolling_apr_avg']:.2f}%, Entry Threshold={params['entry_apr']:.2f}%"
                 )
 
-                # --- MODIFIED: Added validation step ---
                 if self.validate_signal(symbol, latest_data):
                     if (
                         latest_data["apr"] > params["entry_apr"]

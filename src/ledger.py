@@ -1,5 +1,3 @@
-# src/ledger.py (Version 1.2 - Final Comprehensive Version)
-
 import pandas as pd
 import os
 import datetime
@@ -8,7 +6,6 @@ import datetime
 class PaperTradingLedger:
     def __init__(self, filename="data/paper_trade_log.csv"):
         self.filename = filename
-        # Using your original, more comprehensive column list
         self.columns = [
             "timestamp",
             "symbol",

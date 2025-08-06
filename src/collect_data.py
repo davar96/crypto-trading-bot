@@ -1,5 +1,3 @@
-# src/collect_data.py (Version 2.3 - Final Version with 4h)
-
 import ccxt
 import pandas as pd
 import os
@@ -9,7 +7,7 @@ from dotenv import load_dotenv
 import argparse
 
 # --- Configuration ---
-DEFAULT_START_YEAR = 2018  # Use a longer history as required by the backtester
+DEFAULT_START_YEAR = 2018
 
 
 def create_exchange(use_testnet=False):
@@ -117,14 +115,12 @@ if __name__ == "__main__":
     exchange_instance = create_exchange(use_testnet=args.testnet)
 
     if args.data_type == "ohlcv":
-        # This now explicitly means SPOT ohlcv and fetches all required timeframes
         fetch_ohlcv_data(exchange_instance, args.symbol, "1d", start_date)
         fetch_ohlcv_data(exchange_instance, args.symbol, "4h", start_date)
         fetch_ohlcv_data(exchange_instance, args.symbol, "1h", start_date)
     elif args.data_type == "funding":
         fetch_funding_rate_history(exchange_instance, args.symbol, start_date)
     elif args.data_type == "perp_ohlcv":
-        # This now explicitly means PERPETUAL ohlcv and fetches all required timeframes
         perp_symbol = f"{args.symbol.split('/')[0]}/USDT:USDT"
         fetch_ohlcv_data(exchange_instance, perp_symbol, "1d", start_date)
         fetch_ohlcv_data(exchange_instance, perp_symbol, "4h", start_date)

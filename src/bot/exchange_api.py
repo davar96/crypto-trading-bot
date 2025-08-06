@@ -60,9 +60,9 @@ class ExchangeAPI:
                 "symbol": self.exchange.market_id(symbol),
                 "side": "SELL",
                 "quantity": amount_str,
-                "price": tp_price_str,  # Take-Profit Price (acts as a LIMIT order)
-                "stopPrice": sl_price_str,  # Stop-Loss Trigger Price
-                "stopLimitPrice": sl_price_str,  # We set this to the same to make it a Stop-Market order
+                "price": tp_price_str,
+                "stopPrice": sl_price_str,
+                "stopLimitPrice": sl_price_str,
                 "stopLimitTimeInForce": "GTC",
             }
         )
@@ -81,7 +81,6 @@ class ExchangeAPI:
         """Cancels all open orders for a given symbol."""
         logger.info(f"ExchangeAPI: Cancelling all open orders for {symbol}")
         try:
-            # The unified method is great for this
             return self.exchange.cancel_all_orders(symbol)
         except Exception as e:
             logger.error(f"ExchangeAPI Error: Could not cancel all orders for {symbol}. {e}")
@@ -90,7 +89,6 @@ class ExchangeAPI:
         """Places a standalone stop-market sell order."""
         logger.info(f"ExchangeAPI: Placing STOP-MARKET SELL for {amount} of {symbol} at trigger price ${stop_price}")
 
-        # Format amount and price to exchange precision
         amount_str = self.exchange.amount_to_precision(symbol, amount)
         price_str = self.exchange.price_to_precision(symbol, stop_price)
 
